@@ -5134,7 +5134,10 @@ class TocWidget extends WidgetType {
           const targetLine = view.state.doc.line(targetLineNumber);
           view.dispatch({
             selection: { anchor: targetLine.from },
-            effects: EditorView.scrollIntoView(targetLine.from, { y: "start", yMargin: 50 }),
+            effects: [
+              EditorView.scrollIntoView(targetLine.from, { y: "start", yMargin: 50 }),
+              suppressHeightMeasurementScrollSnapshotEffect.of(null),
+            ],
           });
           view.focus();
         }
@@ -7377,6 +7380,7 @@ function buildDecorations(
 // =====================================================
 
 const setEditorFocusedEffect = StateEffect.define<boolean>();
+const suppressHeightMeasurementScrollSnapshotEffect = StateEffect.define<null>();
 const updateHeightCacheEffect = StateEffect.define<{
   heights: Map<number, number>;
   rawLineHeights: Map<number, number>;
@@ -7593,11 +7597,20 @@ const livePreviewViewPlugin = ViewPlugin.fromClass(
       const forceRefresh = update.transactions.some((tr: any) =>
         tr.effects.some((e: any) => e.is(refreshLivePreviewEffect)),
       );
+      const suppressHeightMeasurementScrollSnapshot = update.transactions.some((tr: any) =>
+        tr.effects.some((e: any) => e.is(suppressHeightMeasurementScrollSnapshotEffect)),
+      );
+      const shouldMeasureHeight = update.docChanged
+        || update.selectionSet
+        || update.focusChanged
+        || rawHeightChanged
+        || forceRefresh
+        || suppressHeightMeasurementScrollSnapshot;
       if (
         !pointerDragging
-        && (update.docChanged || update.selectionSet || update.focusChanged || rawHeightChanged || forceRefresh)
+        && shouldMeasureHeight
       ) {
-        this.scheduleHeightMeasurement(update.view);
+        this.scheduleHeightMeasurement(update.view, { preserveScroll: !suppressHeightMeasurementScrollSnapshot });
       }
 
       // Auto-open modal when cursor enters a block via editing (backspace, etc.)
@@ -7634,7 +7647,8 @@ const livePreviewViewPlugin = ViewPlugin.fromClass(
       }
     }
 
-    scheduleHeightMeasurement(view: EditorView) {
+    scheduleHeightMeasurement(view: EditorView, options: { preserveScroll?: boolean } = {}) {
+      const preserveScroll = options.preserveScroll !== false;
       view.requestMeasure({
         read(view) {
           const lineHeights = new Map<number, number>();
@@ -7687,15 +7701,16 @@ const livePreviewViewPlugin = ViewPlugin.fromClass(
           if (changed) {
             const heights = measured.lineHeights;
             const rawLineHeights = measured.rawLineHeights;
-            const scrollEffect = view.scrollSnapshot();
+            const effects: StateEffect<any>[] = [
+              updateHeightCacheEffect.of({ heights, rawLineHeights, rawBaseHeight }),
+            ];
+            const scrollEffect = preserveScroll ? view.scrollSnapshot() : null;
+            if (scrollEffect) effects.push(scrollEffect);
             // Defer dispatch — write() runs inside CM6's measure phase where
             // dispatch is not allowed ("update is in progress" error).
             queueMicrotask(() => {
               view.dispatch({
-                effects: [
-                  updateHeightCacheEffect.of({ heights, rawLineHeights, rawBaseHeight }),
-                  scrollEffect,
-                ],
+                effects,
               });
             });
           }
