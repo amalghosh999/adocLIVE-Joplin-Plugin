@@ -1,0 +1,1849 @@
+import {
+  structureItems,
+  listItems,
+  contentItems,
+  mediaItems,
+  admonitionTypes,
+  sourceLanguages,
+  handleAdmonition,
+  handleSource,
+  handleTable,
+  handleBlock,
+  handleImage as doImage,
+  handleVideo as doVideo,
+  handleAudio as doAudio,
+  handleLink as doLink,
+  handleMath,
+  handleMermaid,
+  mermaidDiagramTypes,
+  mathNotations,
+  symbolCategories,
+  insertText,
+  positionDropdown,
+} from "../toolbar-actions";
+import { openImageDialog, openVideoDialog, openAudioDialog, createResourceFromFile, getTemplates, getTemplateContent, markAsTemplate, removeTemplate, getSnippets, removeSnippet, updateSnippet, type Snippet } from "../../ipc";
+import { defaultVideoOptions, parseEmbedUrl, type VideoOptions } from "../../utils/video-macro";
+import { defaultAudioOptions, type AudioOptions } from "../../utils/audio-macro";
+import { updateResourceUrls } from "../../editor/live-preview";
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+const ARROW_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`;
+
+/** Creates a `.ribbon-section` wrapper with label and child controls. */
+function createRibbonSection(label: string, ...children: HTMLElement[]): HTMLElement {
+  const section = document.createElement("div");
+  section.className = "ribbon-section";
+
+  const controls = document.createElement("div");
+  controls.className = "ribbon-section-controls";
+  for (const child of children) controls.appendChild(child);
+
+  const lbl = document.createElement("div");
+  lbl.className = "ribbon-section-label";
+  lbl.textContent = label;
+
+  section.appendChild(controls);
+  section.appendChild(lbl);
+  return section;
+}
+
+// ---------------------------------------------------------------------------
+// Dropdown state management
+// ---------------------------------------------------------------------------
+
+interface DropdownState {
+  admonition: boolean;
+  source: boolean;
+  table: boolean;
+  blocks: boolean;
+  diagram: boolean;
+  math: boolean;
+  image: boolean;
+  video: boolean;
+  audio: boolean;
+  link: boolean;
+  template: boolean;
+  symbols: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
+
+export function buildInsertPanel(): { element: HTMLElement; cleanup: () => void } {
+  const wrapper = document.createElement("div");
+  wrapper.style.display = "contents";
+
+  const state: DropdownState = {
+    admonition: false,
+    source: false,
+    table: false,
+    blocks: false,
+    diagram: false,
+    math: false,
+    image: false,
+    video: false,
+    audio: false,
+    link: false,
+    template: false,
+    symbols: false,
+  };
+
+  // Map of split-btn-wrap elements for outside-click detection
+  const wrapEls: Map<keyof DropdownState, HTMLElement> = new Map();
+
+  function closeAll() {
+    for (const key of Object.keys(state) as (keyof DropdownState)[]) {
+      state[key] = false;
+      const wrap = wrapEls.get(key);
+      const dd = wrap?.querySelector(".split-dropdown");
+      if (dd) dd.remove();
+    }
+  }
+
+  function toggle(which: keyof DropdownState) {
+    const was = state[which];
+    closeAll();
+    if (!was) {
+      state[which] = true;
+      showDropdown(which);
+    }
+  }
+
+  // Window click handler to close dropdowns on outside click
+  function handleWindowClick(e: MouseEvent) {
+    const target = e.target as Element;
+    if (target?.closest?.(".split-btn-wrap")) return;
+    const anyOpen = Object.values(state).some(Boolean);
+    if (anyOpen) closeAll();
+  }
+  window.addEventListener("mousedown", handleWindowClick, true);
+
+  // -----------------------------------------------------------------------
+  // Form state (closure variables)
+  // -----------------------------------------------------------------------
+  let tableRows = 3;
+  let tableCols = 3;
+  let imageSource: "web" | "local" = "web";
+  let imageUrl = "";
+  let imageLocalPath = "";
+  let imageAlt = "";
+  let imageTitle = "";
+  let imageCaption = "";
+  let imageScale = 100;
+  let imageAlign: "center" | "left" | "right" = "center";
+  let imageCaptionPosition: "below" | "left" | "right" = "below";
+  let imagePickerError = "";
+  let videoForm: VideoOptions = defaultVideoOptions();
+  let videoTab: "local" | "online" = "local";
+  let videoLocalPath = "";
+  let videoOnlineUrl = "";
+  let videoPickerError = "";
+  let audioForm: AudioOptions = defaultAudioOptions();
+  let audioSource: "local" | "remote" = "local";
+  let audioLocalPath = "";
+  let audioRemoteUrl = "";
+  let audioPickerError = "";
+  let linkUrl = "";
+  let linkText = "";
+  let linkType: "external" | "wiki" = "external";
+  let activeSymbolCat = 0;
+
+  // Template state
+  interface TemplateNode { id: string; title: string; }
+  let templateOptions: TemplateNode[] = [];
+  let snippetOptions: Snippet[] = [];
+  let templateQuery = "";
+  let templateHighlightIndex = -1;
+  let selectedTemplateId = "";
+  let templateLoading = false;
+  let templateError = "";
+  let templateActionError = "";
+  let assigningTemplate = false;
+  let insertingTemplate = false;
+
+  function getFilteredTemplates(): TemplateNode[] {
+    const query = templateQuery.trim().toLowerCase();
+    if (!query) return templateOptions;
+    return templateOptions.filter((t) => t.title.toLowerCase().includes(query));
+  }
+
+  function getFilteredSnippets(): Snippet[] {
+    const query = templateQuery.trim().toLowerCase();
+    if (!query) return snippetOptions;
+    return snippetOptions.filter((s) => s.name.toLowerCase().includes(query) || s.content.toLowerCase().includes(query));
+  }
+
+  function getResolvedTemplate(): TemplateNode | undefined {
+    if (selectedTemplateId) {
+      return templateOptions.find((t) => t.id === selectedTemplateId);
+    }
+    const filtered = getFilteredTemplates();
+    if (!filtered.length) return undefined;
+    if (templateHighlightIndex >= 0 && templateHighlightIndex < filtered.length) {
+      return filtered[templateHighlightIndex];
+    }
+    return filtered[0];
+  }
+
+  // -----------------------------------------------------------------------
+  // Dropdown builders
+  // -----------------------------------------------------------------------
+
+  function showDropdown(which: keyof DropdownState) {
+    switch (which) {
+      case "admonition": showAdmonitionDropdown(); break;
+      case "source": showSourceDropdown(); break;
+      case "table": showTableDropdown(); break;
+      case "blocks": showBlocksDropdown(); break;
+      case "diagram": showDiagramDropdown(); break;
+      case "math": showMathDropdown(); break;
+      case "image": showImageDropdown(); break;
+      case "video": showVideoDropdown(); break;
+      case "audio": showAudioDropdown(); break;
+      case "link": showLinkDropdown(); break;
+      case "template": showTemplateDropdown(); break;
+      case "symbols": showSymbolsDropdown(); break;
+    }
+  }
+
+  // -- Admonition --
+  function showAdmonitionDropdown() {
+    const wrap = wrapEls.get("admonition")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+    for (const type of admonitionTypes) {
+      const btn = document.createElement("button");
+      btn.className = "admonition-item";
+      btn.textContent = type.label;
+      btn.addEventListener("click", () => { handleAdmonition(type.value); closeAll(); });
+      dd.appendChild(btn);
+    }
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -- Source --
+  function showSourceDropdown() {
+    const wrap = wrapEls.get("source")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+    for (const lang of sourceLanguages) {
+      const btn = document.createElement("button");
+      btn.textContent = lang;
+      btn.addEventListener("click", () => { handleSource(lang); closeAll(); });
+      dd.appendChild(btn);
+    }
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -- Table --
+  function showTableDropdown() {
+    const wrap = wrapEls.get("table")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+
+    const form = document.createElement("div");
+    form.className = "split-dropdown-form table-size-form";
+
+    // Rows
+    const rowLabel = document.createElement("label");
+    rowLabel.textContent = "Rows";
+    const rowInput = document.createElement("input");
+    rowInput.type = "number";
+    rowInput.className = "split-form-input table-size-input";
+    rowInput.min = "1";
+    rowInput.max = "20";
+    rowInput.value = String(tableRows);
+    rowInput.addEventListener("input", () => { tableRows = parseInt(rowInput.value) || 3; });
+    rowLabel.appendChild(rowInput);
+
+    // Cols
+    const colLabel = document.createElement("label");
+    colLabel.textContent = "Cols";
+    const colInput = document.createElement("input");
+    colInput.type = "number";
+    colInput.className = "split-form-input table-size-input";
+    colInput.min = "1";
+    colInput.max = "10";
+    colInput.value = String(tableCols);
+    colInput.addEventListener("input", () => { tableCols = parseInt(colInput.value) || 3; });
+    colLabel.appendChild(colInput);
+
+    const insertBtn = document.createElement("button");
+    insertBtn.textContent = "Insert";
+    insertBtn.addEventListener("click", () => { handleTable(tableRows, tableCols); closeAll(); });
+
+    form.appendChild(rowLabel);
+    form.appendChild(colLabel);
+    form.appendChild(insertBtn);
+    dd.appendChild(form);
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -- Blocks --
+  function showBlocksDropdown() {
+    const wrap = wrapEls.get("blocks")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+
+    const items: { label: string; type: string }[] = [
+      { label: "Sidebar (****)", type: "sidebar" },
+      { label: "Example (====)", type: "example" },
+      { label: "Collapsible", type: "collapsible" },
+      { label: "Page Break (<<<)", type: "pagebreak" },
+    ];
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.textContent = item.label;
+      btn.addEventListener("click", () => { handleBlock(item.type); closeAll(); });
+      dd.appendChild(btn);
+    }
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -- Diagram --
+  function showDiagramDropdown() {
+    const wrap = wrapEls.get("diagram")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+    dd.style.maxHeight = "300px";
+    dd.style.overflowY = "auto";
+    for (const type of mermaidDiagramTypes) {
+      const btn = document.createElement("button");
+      btn.textContent = type.label;
+      btn.addEventListener("click", () => { handleMermaid(type.value); closeAll(); });
+      dd.appendChild(btn);
+    }
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -- Math --
+  function showMathDropdown() {
+    const wrap = wrapEls.get("math")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+    for (const item of mathNotations) {
+      const btn = document.createElement("button");
+      btn.className = "admonition-item";
+      btn.textContent = item.label;
+      btn.addEventListener("click", () => { handleMath(item.value, item.block); closeAll(); });
+      dd.appendChild(btn);
+    }
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -- Image --
+  function showImageDropdown() {
+    const wrap = wrapEls.get("image")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+
+    const form = document.createElement("div");
+    form.className = "split-dropdown-form img-form";
+
+    // Tab buttons (Web / Local)
+    const typeTabs = document.createElement("div");
+    typeTabs.className = "link-type-tabs";
+
+    const webTab = document.createElement("button");
+    webTab.className = "link-type-tab active";
+    webTab.textContent = "Web";
+
+    const localTab = document.createElement("button");
+    localTab.className = "link-type-tab";
+    localTab.textContent = "Local";
+
+    typeTabs.appendChild(webTab);
+    typeTabs.appendChild(localTab);
+    form.appendChild(typeTabs);
+
+    // Dynamic content area
+    const dynamicArea = document.createElement("div");
+
+    function renderImageSourceFields() {
+      dynamicArea.innerHTML = "";
+      webTab.classList.toggle("active", imageSource === "web");
+      localTab.classList.toggle("active", imageSource === "local");
+
+      if (imageSource === "web") {
+        const urlLabel = document.createElement("label");
+        urlLabel.setAttribute("for", "image-web-url");
+        urlLabel.textContent = "Image URL";
+        dynamicArea.appendChild(urlLabel);
+
+        const urlInput = document.createElement("input");
+        urlInput.id = "image-web-url";
+        urlInput.type = "text";
+        urlInput.className = "split-form-input";
+        urlInput.placeholder = "https://example.com/image.png";
+        urlInput.value = imageUrl;
+        urlInput.addEventListener("input", () => { imageUrl = urlInput.value; });
+        urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitImage(); });
+        dynamicArea.appendChild(urlInput);
+      } else {
+        const pathLabel = document.createElement("label");
+        pathLabel.setAttribute("for", "image-local-path");
+        pathLabel.textContent = "Browse...";
+        dynamicArea.appendChild(pathLabel);
+
+        const picker = document.createElement("div");
+        picker.className = "image-local-picker";
+
+        const browseBtn = document.createElement("button");
+        browseBtn.type = "button";
+        browseBtn.className = "image-browse-btn";
+        browseBtn.textContent = "Browse...";
+        browseBtn.addEventListener("click", async () => {
+          imagePickerError = "";
+          try {
+            const result = await openImageDialog();
+            if (result.filePath) {
+              // Create resource from file and use the resource URL
+              const resource = await createResourceFromFile(result.filePath);
+              if (resource.resourceId && resource.dataUrl) {
+                updateResourceUrls([{ id: resource.resourceId, dataUrl: resource.dataUrl }]);
+              }
+              imageLocalPath = `:/${resource.resourceId}`;
+              pathInput.value = imageLocalPath;
+              // Fire input event so checkSubmitState listener updates the button
+              pathInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          } catch (error) {
+            imagePickerError = "Couldn't open the file picker.";
+            console.error("Failed to browse for image:", error);
+            renderImageSourceFields();
+          }
+        });
+        picker.appendChild(browseBtn);
+
+        const pathInput = document.createElement("input");
+        pathInput.id = "image-local-path";
+        pathInput.type = "text";
+        pathInput.className = "split-form-input image-local-path";
+        pathInput.value = imageLocalPath;
+        pathInput.placeholder = "No file selected";
+        pathInput.readOnly = true;
+        picker.appendChild(pathInput);
+        dynamicArea.appendChild(picker);
+
+        if (imagePickerError) {
+          const errDiv = document.createElement("div");
+          errDiv.className = "image-picker-error";
+          errDiv.textContent = imagePickerError;
+          dynamicArea.appendChild(errDiv);
+        }
+      }
+    }
+
+    webTab.addEventListener("click", () => { imageSource = "web"; imagePickerError = ""; renderImageSourceFields(); });
+    localTab.addEventListener("click", () => { imageSource = "local"; imagePickerError = ""; renderImageSourceFields(); });
+
+    renderImageSourceFields();
+    form.appendChild(dynamicArea);
+
+    // ALT text
+    const altLabel = document.createElement("label");
+    altLabel.setAttribute("for", "image-alt");
+    altLabel.innerHTML = `Alt Text <span class="label-hint">(optional)</span>`;
+    form.appendChild(altLabel);
+    const altInput = document.createElement("input");
+    altInput.id = "image-alt";
+    altInput.type = "text";
+    altInput.className = "split-form-input";
+    altInput.placeholder = "Description";
+    altInput.value = imageAlt;
+    altInput.addEventListener("input", () => { imageAlt = altInput.value; });
+    altInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitImage(); });
+    form.appendChild(altInput);
+
+    // Scale slider
+    const scaleHeader = document.createElement("div");
+    scaleHeader.className = "image-slider-header";
+    const scaleLabel = document.createElement("label");
+    scaleLabel.setAttribute("for", "image-scale");
+    scaleLabel.textContent = "Scale";
+    const scaleVal = document.createElement("span");
+    scaleVal.textContent = `${imageScale}%`;
+    scaleHeader.appendChild(scaleLabel);
+    scaleHeader.appendChild(scaleVal);
+    form.appendChild(scaleHeader);
+
+    const scaleSlider = document.createElement("input");
+    scaleSlider.id = "image-scale";
+    scaleSlider.type = "range";
+    scaleSlider.className = "image-slider";
+    scaleSlider.min = "10";
+    scaleSlider.max = "200";
+    scaleSlider.step = "5";
+    scaleSlider.value = String(imageScale);
+    scaleSlider.addEventListener("input", () => { imageScale = parseInt(scaleSlider.value); scaleVal.textContent = `${imageScale}%`; });
+    form.appendChild(scaleSlider);
+
+    // Align
+    const alignLabel = document.createElement("label");
+    alignLabel.setAttribute("for", "image-align");
+    alignLabel.textContent = "Align";
+    form.appendChild(alignLabel);
+
+    const alignSelect = document.createElement("select");
+    alignSelect.id = "image-align";
+    alignSelect.className = "split-form-input image-align-select";
+    for (const opt of [{ value: "center", text: "Center" }, { value: "left", text: "Left" }, { value: "right", text: "Right" }]) {
+      const option = document.createElement("option");
+      option.value = opt.value;
+      option.textContent = opt.text;
+      if (opt.value === imageAlign) option.selected = true;
+      alignSelect.appendChild(option);
+    }
+    alignSelect.addEventListener("change", () => {
+      imageAlign = alignSelect.value as "center" | "left" | "right";
+      updateCaptionPosOptions();
+    });
+    form.appendChild(alignSelect);
+
+    // Title
+    const titleLabel = document.createElement("label");
+    titleLabel.setAttribute("for", "image-title");
+    titleLabel.innerHTML = `Title <span class="label-hint">(optional)</span>`;
+    form.appendChild(titleLabel);
+    const titleInput = document.createElement("input");
+    titleInput.id = "image-title";
+    titleInput.type = "text";
+    titleInput.className = "split-form-input";
+    titleInput.placeholder = "Image title";
+    titleInput.value = imageTitle;
+    titleInput.addEventListener("input", () => { imageTitle = titleInput.value; });
+    titleInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitImage(); });
+    form.appendChild(titleInput);
+
+    // Caption
+    const captionLabel = document.createElement("label");
+    captionLabel.setAttribute("for", "image-caption");
+    captionLabel.innerHTML = `Caption <span class="label-hint">(optional)</span>`;
+    form.appendChild(captionLabel);
+    const captionInput = document.createElement("input");
+    captionInput.id = "image-caption";
+    captionInput.type = "text";
+    captionInput.className = "split-form-input";
+    captionInput.placeholder = "Caption shown with the image";
+    captionInput.value = imageCaption;
+    captionInput.addEventListener("input", () => { imageCaption = captionInput.value; });
+    captionInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitImage(); });
+    form.appendChild(captionInput);
+
+    // Caption Position
+    const captionPosLabel = document.createElement("label");
+    captionPosLabel.setAttribute("for", "image-caption-pos");
+    captionPosLabel.textContent = "Caption Position";
+    form.appendChild(captionPosLabel);
+
+    const captionPosSelect = document.createElement("select");
+    captionPosSelect.id = "image-caption-pos";
+    captionPosSelect.className = "split-form-input";
+    captionPosSelect.addEventListener("change", () => {
+      imageCaptionPosition = captionPosSelect.value as "below" | "left" | "right";
+    });
+    form.appendChild(captionPosSelect);
+
+    const updateCaptionPosOptions = () => {
+      captionPosSelect.innerHTML = "";
+      const belowOpt = document.createElement("option");
+      belowOpt.value = "below"; belowOpt.textContent = "BELOW";
+      captionPosSelect.appendChild(belowOpt);
+      if (imageAlign === "left") {
+        const rightOpt = document.createElement("option");
+        rightOpt.value = "right"; rightOpt.textContent = "RIGHT";
+        captionPosSelect.appendChild(rightOpt);
+      } else if (imageAlign === "right") {
+        const leftOpt = document.createElement("option");
+        leftOpt.value = "left"; leftOpt.textContent = "LEFT";
+        captionPosSelect.appendChild(leftOpt);
+      }
+      const validValues = Array.from(captionPosSelect.options).map(o => o.value);
+      captionPosSelect.value = validValues.includes(imageCaptionPosition) ? imageCaptionPosition : "below";
+      imageCaptionPosition = captionPosSelect.value as "below" | "left" | "right";
+    };
+    updateCaptionPosOptions();
+
+    // Submit
+    const submitBtn = document.createElement("button");
+    submitBtn.textContent = "Insert Image";
+    submitBtn.disabled = !getImageTarget().trim();
+    const checkSubmitState = () => {
+      submitBtn.disabled = !getImageTarget().trim();
+    };
+    form.addEventListener("input", checkSubmitState);
+    submitBtn.addEventListener("click", submitImage);
+    form.appendChild(submitBtn);
+
+    dd.appendChild(form);
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  function getImageTarget(): string {
+    return imageSource === "web" ? imageUrl : imageLocalPath;
+  }
+
+  function submitImage() {
+    doImage({
+      target: getImageTarget(),
+      alt: imageAlt,
+      title: imageTitle,
+      caption: imageCaption,
+      width: imageScale,
+      height: imageScale,
+      align: imageAlign,
+      captionPosition: imageCaptionPosition,
+    });
+    // Reset
+    imageSource = "web";
+    imageUrl = "";
+    imageLocalPath = "";
+    imageAlt = "";
+    imageTitle = "";
+    imageCaption = "";
+    imageScale = 100;
+    imageAlign = "center";
+    imageCaptionPosition = "below";
+    imagePickerError = "";
+    closeAll();
+  }
+
+  async function createResourceTarget(filePath: string): Promise<string> {
+    const resource = await createResourceFromFile(filePath);
+    if (resource.resourceId && resource.dataUrl) {
+      updateResourceUrls([{ id: resource.resourceId, dataUrl: resource.dataUrl }]);
+    }
+    return resource.resourceId ? `:/${resource.resourceId}` : "";
+  }
+
+  function createFormLabel(text: string, forId?: string): HTMLLabelElement {
+    const label = document.createElement("label");
+    if (forId) label.setAttribute("for", forId);
+    label.textContent = text;
+    return label;
+  }
+
+  function createTextInput(value: string, onInput: (value: string) => void, placeholder = ""): HTMLInputElement {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "split-form-input";
+    input.value = value;
+    input.placeholder = placeholder;
+    input.addEventListener("input", () => onInput(input.value));
+    return input;
+  }
+
+  function createNumberInput(value: number, onInput: (value: number) => void): HTMLInputElement {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.className = "split-form-input";
+    input.value = value > 0 ? String(value) : "";
+    input.addEventListener("input", () => {
+      const parsed = Number.parseInt(input.value, 10);
+      onInput(Number.isFinite(parsed) && parsed > 0 ? parsed : 0);
+    });
+    return input;
+  }
+
+  function createCheckbox(labelText: string, checked: boolean, onChange: (checked: boolean) => void): HTMLLabelElement {
+    const label = document.createElement("label");
+    label.className = "ribbon-toggle";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = checked;
+    cb.addEventListener("change", () => onChange(cb.checked));
+    const span = document.createElement("span");
+    span.textContent = labelText;
+    label.appendChild(cb);
+    label.appendChild(span);
+    return label;
+  }
+
+  // -- Video --
+  function resetVideoForm() {
+    videoForm = defaultVideoOptions();
+    videoTab = "local";
+    videoLocalPath = "";
+    videoOnlineUrl = "";
+    videoPickerError = "";
+  }
+
+  function showVideoDropdown() {
+    const wrap = wrapEls.get("video")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+
+    const form = document.createElement("div");
+    form.className = "split-dropdown-form img-form";
+
+    const tabs = document.createElement("div");
+    tabs.className = "link-type-tabs";
+    const localTab = document.createElement("button");
+    localTab.type = "button";
+    localTab.className = `link-type-tab${videoTab === "local" ? " active" : ""}`;
+    localTab.textContent = "Local";
+    const onlineTab = document.createElement("button");
+    onlineTab.type = "button";
+    onlineTab.className = `link-type-tab${videoTab === "online" ? " active" : ""}`;
+    onlineTab.textContent = "Online";
+    tabs.append(localTab, onlineTab);
+    form.appendChild(tabs);
+
+    const body = document.createElement("div");
+    form.appendChild(body);
+
+    function rerender() {
+      closeAll();
+      state.video = true;
+      showVideoDropdown();
+    }
+
+    localTab.addEventListener("click", () => { videoTab = "local"; rerender(); });
+    onlineTab.addEventListener("click", () => { videoTab = "online"; rerender(); });
+
+    if (videoTab === "local") {
+      body.appendChild(createFormLabel("Local video"));
+      const picker = document.createElement("div");
+      picker.className = "image-local-picker";
+      const browseBtn = document.createElement("button");
+      browseBtn.type = "button";
+      browseBtn.className = "image-browse-btn";
+      browseBtn.textContent = "Browse...";
+      const pathInput = document.createElement("input");
+      pathInput.type = "text";
+      pathInput.className = "split-form-input image-local-path";
+      pathInput.readOnly = true;
+      pathInput.placeholder = "No file selected";
+      pathInput.value = videoLocalPath;
+      browseBtn.addEventListener("click", async () => {
+        videoPickerError = "";
+        try {
+          const picked = await openVideoDialog();
+          if (!picked.filePath) return;
+          videoLocalPath = await createResourceTarget(picked.filePath);
+          videoForm.target = videoLocalPath;
+          videoForm.service = null;
+          pathInput.value = videoLocalPath;
+          submitVideoBtn.disabled = !videoForm.target.trim();
+        } catch (error) {
+          videoPickerError = "Couldn't attach the selected video.";
+          console.error("Failed to browse for video:", error);
+          rerender();
+        }
+      });
+      picker.append(browseBtn, pathInput);
+      body.appendChild(picker);
+      if (videoPickerError) {
+        const err = document.createElement("div");
+        err.className = "image-picker-error";
+        err.textContent = videoPickerError;
+        body.appendChild(err);
+      }
+    } else {
+      body.appendChild(createFormLabel("Video URL"));
+      const urlInput = createTextInput(videoOnlineUrl, (value) => {
+        videoOnlineUrl = value;
+        const parsed = parseEmbedUrl(value);
+        if (parsed) {
+          videoForm.target = parsed.id;
+          videoForm.service = parsed.service;
+          if (parsed.list) videoForm.list = parsed.list;
+          if (parsed.start) videoForm.start = parsed.start;
+        } else {
+          videoForm.target = value.trim();
+          videoForm.service = null;
+        }
+        submitVideoBtn.disabled = !videoForm.target.trim();
+      }, "https://youtube.com/watch?v=... or https://example.com/video.mp4");
+      body.appendChild(urlInput);
+    }
+
+    form.appendChild(createFormLabel("Caption"));
+    form.appendChild(createTextInput(videoForm.caption, (value) => { videoForm.caption = value; }, "Optional title"));
+
+    const sizeRow = document.createElement("div");
+    sizeRow.className = "table-size-form";
+    const widthWrap = document.createElement("label");
+    widthWrap.textContent = "Width";
+    widthWrap.appendChild(createNumberInput(videoForm.width, (value) => { videoForm.width = value; }));
+    const heightWrap = document.createElement("label");
+    heightWrap.textContent = "Height";
+    heightWrap.appendChild(createNumberInput(videoForm.height, (value) => { videoForm.height = value; }));
+    sizeRow.append(widthWrap, heightWrap);
+    form.appendChild(sizeRow);
+
+    const timeRow = document.createElement("div");
+    timeRow.className = "table-size-form";
+    const startWrap = document.createElement("label");
+    startWrap.textContent = "Start";
+    startWrap.appendChild(createNumberInput(videoForm.start, (value) => { videoForm.start = value; }));
+    const endWrap = document.createElement("label");
+    endWrap.textContent = "End";
+    endWrap.appendChild(createNumberInput(videoForm.end, (value) => { videoForm.end = value; }));
+    timeRow.append(startWrap, endWrap);
+    form.appendChild(timeRow);
+
+    const optionsWrap = document.createElement("div");
+    optionsWrap.className = "editor-toggles";
+    optionsWrap.appendChild(createCheckbox("Autoplay", videoForm.options.autoplay, (value) => { videoForm.options.autoplay = value; }));
+    optionsWrap.appendChild(createCheckbox("Loop", videoForm.options.loop, (value) => { videoForm.options.loop = value; }));
+    optionsWrap.appendChild(createCheckbox("Muted", videoForm.options.muted, (value) => { videoForm.options.muted = value; }));
+    optionsWrap.appendChild(createCheckbox("No controls", videoForm.options.nocontrols, (value) => { videoForm.options.nocontrols = value; }));
+    form.appendChild(optionsWrap);
+
+    const submitVideoBtn = document.createElement("button");
+    submitVideoBtn.textContent = "Insert Video";
+    submitVideoBtn.disabled = !videoForm.target.trim();
+    submitVideoBtn.addEventListener("click", () => {
+      doVideo(videoForm);
+      resetVideoForm();
+      closeAll();
+    });
+    form.appendChild(submitVideoBtn);
+
+    dd.appendChild(form);
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -- Audio --
+  function resetAudioForm() {
+    audioForm = defaultAudioOptions();
+    audioSource = "local";
+    audioLocalPath = "";
+    audioRemoteUrl = "";
+    audioPickerError = "";
+  }
+
+  function showAudioDropdown() {
+    const wrap = wrapEls.get("audio")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+
+    const form = document.createElement("div");
+    form.className = "split-dropdown-form img-form";
+
+    const tabs = document.createElement("div");
+    tabs.className = "link-type-tabs";
+    const localTab = document.createElement("button");
+    localTab.type = "button";
+    localTab.className = `link-type-tab${audioSource === "local" ? " active" : ""}`;
+    localTab.textContent = "Local";
+    const remoteTab = document.createElement("button");
+    remoteTab.type = "button";
+    remoteTab.className = `link-type-tab${audioSource === "remote" ? " active" : ""}`;
+    remoteTab.textContent = "Remote";
+    tabs.append(localTab, remoteTab);
+    form.appendChild(tabs);
+
+    const body = document.createElement("div");
+    form.appendChild(body);
+
+    function rerender() {
+      closeAll();
+      state.audio = true;
+      showAudioDropdown();
+    }
+
+    localTab.addEventListener("click", () => { audioSource = "local"; rerender(); });
+    remoteTab.addEventListener("click", () => { audioSource = "remote"; rerender(); });
+
+    if (audioSource === "local") {
+      body.appendChild(createFormLabel("Local audio"));
+      const picker = document.createElement("div");
+      picker.className = "image-local-picker";
+      const browseBtn = document.createElement("button");
+      browseBtn.type = "button";
+      browseBtn.className = "image-browse-btn";
+      browseBtn.textContent = "Browse...";
+      const pathInput = document.createElement("input");
+      pathInput.type = "text";
+      pathInput.className = "split-form-input image-local-path";
+      pathInput.readOnly = true;
+      pathInput.placeholder = "No file selected";
+      pathInput.value = audioLocalPath;
+      browseBtn.addEventListener("click", async () => {
+        audioPickerError = "";
+        try {
+          const picked = await openAudioDialog();
+          if (!picked.filePath) return;
+          audioLocalPath = await createResourceTarget(picked.filePath);
+          audioForm.target = audioLocalPath;
+          pathInput.value = audioLocalPath;
+          submitAudioBtn.disabled = !audioForm.target.trim();
+        } catch (error) {
+          audioPickerError = "Couldn't attach the selected audio.";
+          console.error("Failed to browse for audio:", error);
+          rerender();
+        }
+      });
+      picker.append(browseBtn, pathInput);
+      body.appendChild(picker);
+      if (audioPickerError) {
+        const err = document.createElement("div");
+        err.className = "image-picker-error";
+        err.textContent = audioPickerError;
+        body.appendChild(err);
+      }
+    } else {
+      body.appendChild(createFormLabel("Audio URL"));
+      body.appendChild(createTextInput(audioRemoteUrl, (value) => {
+        audioRemoteUrl = value;
+        audioForm.target = value.trim();
+        submitAudioBtn.disabled = !audioForm.target.trim();
+      }, "https://example.com/audio.mp3"));
+    }
+
+    form.appendChild(createFormLabel("Caption"));
+    form.appendChild(createTextInput(audioForm.caption, (value) => { audioForm.caption = value; }, "Optional title"));
+
+    const timeRow = document.createElement("div");
+    timeRow.className = "table-size-form";
+    const startWrap = document.createElement("label");
+    startWrap.textContent = "Start";
+    startWrap.appendChild(createNumberInput(audioForm.start, (value) => { audioForm.start = value; }));
+    const endWrap = document.createElement("label");
+    endWrap.textContent = "End";
+    endWrap.appendChild(createNumberInput(audioForm.end, (value) => { audioForm.end = value; }));
+    timeRow.append(startWrap, endWrap);
+    form.appendChild(timeRow);
+
+    const optionsWrap = document.createElement("div");
+    optionsWrap.className = "editor-toggles";
+    optionsWrap.appendChild(createCheckbox("Autoplay", audioForm.options.autoplay, (value) => { audioForm.options.autoplay = value; }));
+    optionsWrap.appendChild(createCheckbox("Loop", audioForm.options.loop, (value) => { audioForm.options.loop = value; }));
+    optionsWrap.appendChild(createCheckbox("No controls", audioForm.options.nocontrols, (value) => { audioForm.options.nocontrols = value; }));
+    form.appendChild(optionsWrap);
+
+    const submitAudioBtn = document.createElement("button");
+    submitAudioBtn.textContent = "Insert Audio";
+    submitAudioBtn.disabled = !audioForm.target.trim();
+    submitAudioBtn.addEventListener("click", () => {
+      doAudio(audioForm);
+      resetAudioForm();
+      closeAll();
+    });
+    form.appendChild(submitAudioBtn);
+
+    dd.appendChild(form);
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -- Link --
+  function showLinkDropdown() {
+    const wrap = wrapEls.get("link")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+
+    const form = document.createElement("div");
+    form.className = "split-dropdown-form link-form";
+
+    // Tab buttons
+    const typeTabs = document.createElement("div");
+    typeTabs.className = "link-type-tabs";
+
+    const extTab = document.createElement("button");
+    extTab.className = `link-type-tab${linkType === "external" ? " active" : ""}`;
+    extTab.textContent = "External";
+
+    const wikiTab = document.createElement("button");
+    wikiTab.className = `link-type-tab${linkType === "wiki" ? " active" : ""}`;
+    wikiTab.textContent = "Cross-ref";
+
+    typeTabs.appendChild(extTab);
+    typeTabs.appendChild(wikiTab);
+    form.appendChild(typeTabs);
+
+    // Dynamic URL area
+    const urlArea = document.createElement("div");
+
+    function renderLinkFields() {
+      urlArea.innerHTML = "";
+      extTab.classList.toggle("active", linkType === "external");
+      wikiTab.classList.toggle("active", linkType === "wiki");
+
+      const urlLabel = document.createElement("label");
+      urlLabel.textContent = linkType === "external" ? "URL" : "Target ID";
+      urlArea.appendChild(urlLabel);
+
+      const urlInput = document.createElement("input");
+      urlInput.type = "text";
+      urlInput.className = "split-form-input";
+      urlInput.placeholder = linkType === "external" ? "https://example.com" : "section-id or note-id";
+      urlInput.value = linkUrl;
+      urlInput.addEventListener("input", () => {
+        linkUrl = urlInput.value;
+        submitLinkBtn.disabled = !linkUrl.trim();
+      });
+      urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitLink(); });
+      urlArea.appendChild(urlInput);
+    }
+
+    extTab.addEventListener("click", () => { linkType = "external"; renderLinkFields(); });
+    wikiTab.addEventListener("click", () => { linkType = "wiki"; renderLinkFields(); });
+
+    renderLinkFields();
+    form.appendChild(urlArea);
+
+    // Display text
+    const displayLabel = document.createElement("label");
+    displayLabel.innerHTML = `Display text <span class="label-hint">(optional)</span>`;
+    form.appendChild(displayLabel);
+    const displayInput = document.createElement("input");
+    displayInput.type = "text";
+    displayInput.className = "split-form-input";
+    displayInput.placeholder = "Click here";
+    displayInput.value = linkText;
+    displayInput.addEventListener("input", () => { linkText = displayInput.value; });
+    displayInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitLink(); });
+    form.appendChild(displayInput);
+
+    const submitLinkBtn = document.createElement("button");
+    submitLinkBtn.textContent = "Insert Link";
+    submitLinkBtn.disabled = !linkUrl.trim();
+    submitLinkBtn.addEventListener("click", submitLink);
+    form.appendChild(submitLinkBtn);
+
+    dd.appendChild(form);
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  function submitLink() {
+    doLink(linkType, linkUrl, linkText);
+    linkUrl = "";
+    linkText = "";
+    closeAll();
+  }
+
+  // -- Template --
+  function showManageSnippetsModal() {
+    // Overlay backdrop
+    const overlay = document.createElement("div");
+    overlay.className = "snippet-manage-overlay";
+
+    const modal = document.createElement("div");
+    modal.className = "snippet-manage-modal";
+
+    const header = document.createElement("div");
+    header.className = "snippet-manage-header";
+    header.innerHTML = `<span class="snippet-manage-title">Manage Snippets</span>`;
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "snippet-manage-close";
+    closeBtn.textContent = "\u00D7";
+    closeBtn.addEventListener("click", () => overlay.remove());
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+
+    const listDiv = document.createElement("div");
+    listDiv.className = "snippet-manage-list";
+    modal.appendChild(listDiv);
+
+    const statusDiv = document.createElement("div");
+    statusDiv.className = "snippet-prompt-error";
+    statusDiv.style.display = "none";
+    statusDiv.style.padding = "6px 0";
+    modal.appendChild(statusDiv);
+
+    let localSnippets: Snippet[] = [...snippetOptions];
+
+    function renderList() {
+      listDiv.innerHTML = "";
+      statusDiv.style.display = "none";
+      if (localSnippets.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "template-empty-state";
+        empty.textContent = "No snippets saved yet.";
+        listDiv.appendChild(empty);
+        return;
+      }
+      for (const snippet of localSnippets) {
+        const row = document.createElement("div");
+        row.className = "snippet-manage-row";
+
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "snippet-manage-name";
+        nameInput.value = snippet.name;
+        nameInput.placeholder = "Snippet name";
+
+        const contentInput = document.createElement("textarea");
+        contentInput.className = "snippet-manage-content";
+        contentInput.value = snippet.content;
+        contentInput.placeholder = "Snippet content";
+        contentInput.rows = 2;
+
+        const btnRow = document.createElement("div");
+        btnRow.className = "snippet-manage-btn-row";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "snippet-prompt-save";
+        saveBtn.textContent = "Save";
+        saveBtn.addEventListener("click", async () => {
+          const newName = nameInput.value.trim();
+          const newContent = contentInput.value;
+          if (!newName) return;
+          saveBtn.disabled = true;
+          saveBtn.textContent = "Saving...";
+          try {
+            const result = await updateSnippet(snippet.id, newName, newContent);
+            if (result.status === "ok") {
+              snippet.name = newName;
+              snippet.content = newContent;
+              snippetOptions = [...localSnippets].sort((a, b) => a.name.localeCompare(b.name));
+              localSnippets = [...snippetOptions];
+              window.dispatchEvent(new CustomEvent("snippets-changed"));
+              renderList();
+            } else {
+              statusDiv.textContent = result.error || "Failed to save";
+              statusDiv.style.display = "";
+            }
+          } catch {
+            statusDiv.textContent = "Failed to save snippet";
+            statusDiv.style.display = "";
+          }
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save";
+        });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "snippet-prompt-cancel";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.style.color = "#d9534f";
+        deleteBtn.addEventListener("click", async () => {
+          deleteBtn.disabled = true;
+          try {
+            await removeSnippet(snippet.id);
+            localSnippets = localSnippets.filter((s) => s.id !== snippet.id);
+            snippetOptions = [...localSnippets];
+            window.dispatchEvent(new CustomEvent("snippets-changed"));
+            renderList();
+          } catch {
+            statusDiv.textContent = "Failed to delete snippet";
+            statusDiv.style.display = "";
+          }
+        });
+
+        btnRow.appendChild(saveBtn);
+        btnRow.appendChild(deleteBtn);
+
+        row.appendChild(nameInput);
+        row.appendChild(contentInput);
+        row.appendChild(btnRow);
+        listDiv.appendChild(row);
+      }
+    }
+
+    renderList();
+    overlay.appendChild(modal);
+    overlay.addEventListener("mousedown", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    // Append to editor root so CSS theme variables (dark/light) are inherited
+    const editorRoot = document.getElementById("asciidoc-editor-root") || document.body;
+    editorRoot.appendChild(overlay);
+  }
+
+  function showTemplateDropdown() {
+    const wrap = wrapEls.get("template")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open";
+    dd.setAttribute("role", "menu");
+
+    const form = document.createElement("div");
+    form.className = "split-dropdown-form template-form";
+
+    const searchLabel = document.createElement("label");
+    searchLabel.setAttribute("for", "template-search");
+    searchLabel.textContent = "Insert Template";
+    form.appendChild(searchLabel);
+
+    const searchInput = document.createElement("input");
+    searchInput.id = "template-search";
+    searchInput.type = "text";
+    searchInput.className = "split-form-input";
+    searchInput.placeholder = "Start typing a template note title";
+    searchInput.value = templateQuery;
+    searchInput.autocomplete = "off";
+    form.appendChild(searchInput);
+
+    const optionsDiv = document.createElement("div");
+    optionsDiv.className = "template-options";
+    optionsDiv.setAttribute("role", "listbox");
+    optionsDiv.setAttribute("aria-label", "Template notes");
+    form.appendChild(optionsDiv);
+
+    const actionErrorDiv = document.createElement("div");
+    actionErrorDiv.className = "template-status error";
+    actionErrorDiv.style.display = "none";
+    form.appendChild(actionErrorDiv);
+
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "template-actions";
+
+    const assignBtn = document.createElement("button");
+    assignBtn.className = "template-action-button template-secondary-button";
+    assignBtn.textContent = "Assign Note as Template";
+    assignBtn.addEventListener("click", async () => {
+      assigningTemplate = true;
+      assignBtn.textContent = "Assigning...";
+      assignBtn.disabled = true;
+      templateActionError = "";
+      actionErrorDiv.style.display = "none";
+      try {
+        // Plugin sandbox knows the current note ID
+        await markAsTemplate();
+        await loadTemplates();
+        renderOptions();
+      } catch (error) {
+        templateActionError = "Couldn't assign the current note as a template.";
+        actionErrorDiv.textContent = templateActionError;
+        actionErrorDiv.style.display = "";
+        console.error("Failed to assign template:", error);
+      } finally {
+        assigningTemplate = false;
+        assignBtn.textContent = "Assign Note as Template";
+        assignBtn.disabled = false;
+      }
+    });
+
+    const insertBtn = document.createElement("button");
+    insertBtn.className = "template-action-button";
+    insertBtn.textContent = "Insert Template";
+    insertBtn.addEventListener("click", async () => {
+      const template = getResolvedTemplate();
+      if (!template) return;
+      insertingTemplate = true;
+      insertBtn.textContent = "Inserting...";
+      insertBtn.disabled = true;
+      templateActionError = "";
+      actionErrorDiv.style.display = "none";
+      try {
+        const result = await getTemplateContent(template.id);
+        insertText(result.content);
+        closeAll();
+      } catch (error) {
+        templateActionError = "Couldn't insert the selected template.";
+        actionErrorDiv.textContent = templateActionError;
+        actionErrorDiv.style.display = "";
+        console.error("Failed to insert template:", error);
+      } finally {
+        insertingTemplate = false;
+        insertBtn.textContent = "Insert Template";
+        insertBtn.disabled = !getResolvedTemplate();
+      }
+    });
+
+    const manageBtn = document.createElement("button");
+    manageBtn.className = "template-action-button template-secondary-button";
+    manageBtn.textContent = "Manage Snippets";
+    manageBtn.addEventListener("click", () => {
+      closeAll();
+      showManageSnippetsModal();
+    });
+
+    actionsDiv.appendChild(assignBtn);
+    actionsDiv.appendChild(insertBtn);
+    form.appendChild(actionsDiv);
+
+    const secondaryActionsDiv = document.createElement("div");
+    secondaryActionsDiv.className = "template-actions";
+    secondaryActionsDiv.style.marginTop = "4px";
+    secondaryActionsDiv.appendChild(manageBtn);
+    form.appendChild(secondaryActionsDiv);
+
+    function renderOptions() {
+      optionsDiv.innerHTML = "";
+      if (templateLoading) {
+        const loadingDiv = document.createElement("div");
+        loadingDiv.className = "template-empty-state";
+        loadingDiv.textContent = "Loading templates...";
+        optionsDiv.appendChild(loadingDiv);
+        return;
+      }
+      if (templateError) {
+        const errDiv = document.createElement("div");
+        errDiv.className = "template-status error";
+        errDiv.textContent = templateError;
+        optionsDiv.appendChild(errDiv);
+        return;
+      }
+      const filtered = getFilteredTemplates();
+      if (filtered.length === 0) {
+        const emptyDiv = document.createElement("div");
+        emptyDiv.className = "template-empty-state";
+        emptyDiv.textContent = "No template notes match that spelling.";
+        optionsDiv.appendChild(emptyDiv);
+        insertBtn.disabled = true;
+        return;
+      }
+      for (let i = 0; i < filtered.length; i++) {
+        const template = filtered[i];
+        const row = document.createElement("div");
+        row.className = "template-option-row";
+        if (i === templateHighlightIndex) row.classList.add("active");
+        if (template.id === selectedTemplateId) row.classList.add("selected");
+
+        const btn = document.createElement("button");
+        btn.className = "template-option";
+        btn.textContent = template.title;
+        btn.addEventListener("click", () => {
+          selectedTemplateId = template.id;
+          templateQuery = template.title;
+          searchInput.value = templateQuery;
+          templateActionError = "";
+          actionErrorDiv.style.display = "none";
+          const filtered = getFilteredTemplates();
+          templateHighlightIndex = Math.max(0, filtered.findIndex((c) => c.id === template.id));
+          renderOptions();
+        });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "template-delete-btn";
+        deleteBtn.title = "Remove from templates";
+        deleteBtn.textContent = "\u00D7";
+        deleteBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await removeTemplate(template.id);
+            templateOptions = templateOptions.filter((t) => t.id !== template.id);
+            if (selectedTemplateId === template.id) selectedTemplateId = "";
+            templateHighlightIndex = -1;
+            renderOptions();
+          } catch (error) {
+            templateActionError = "Couldn't remove the template.";
+            actionErrorDiv.textContent = templateActionError;
+            actionErrorDiv.style.display = "";
+          }
+        });
+
+        row.appendChild(btn);
+        row.appendChild(deleteBtn);
+        optionsDiv.appendChild(row);
+      }
+      insertBtn.disabled = !getResolvedTemplate();
+
+      // Snippets section
+      const filteredSnippets = getFilteredSnippets();
+      if (filteredSnippets.length > 0) {
+        const sectionLabel = document.createElement("div");
+        sectionLabel.className = "template-section-label";
+        sectionLabel.textContent = "Snippets";
+        optionsDiv.appendChild(sectionLabel);
+
+        for (const snippet of filteredSnippets) {
+          const row = document.createElement("div");
+          row.className = "template-option-row";
+
+          const btn = document.createElement("button");
+          btn.className = "template-option";
+          btn.innerHTML = `<strong>${snippet.name}</strong> <span style="opacity:0.5;font-size:0.85em">${snippet.content.replace(/\n/g, "\u23CE ").slice(0, 40)}</span>`;
+          btn.addEventListener("click", () => {
+            insertText(snippet.content);
+            closeAll();
+          });
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "template-delete-btn";
+          deleteBtn.title = "Delete snippet";
+          deleteBtn.textContent = "\u00D7";
+          deleteBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            try {
+              await removeSnippet(snippet.id);
+              snippetOptions = snippetOptions.filter((s) => s.id !== snippet.id);
+              window.dispatchEvent(new CustomEvent("snippets-changed"));
+              renderOptions();
+            } catch {
+              templateActionError = "Couldn't delete snippet.";
+              actionErrorDiv.textContent = templateActionError;
+              actionErrorDiv.style.display = "";
+            }
+          });
+
+          row.appendChild(btn);
+          row.appendChild(deleteBtn);
+          optionsDiv.appendChild(row);
+        }
+      }
+    }
+
+    searchInput.addEventListener("input", () => {
+      templateQuery = searchInput.value;
+      templateActionError = "";
+      actionErrorDiv.style.display = "none";
+      const normalized = templateQuery.trim().toLowerCase();
+      const exactMatch = normalized
+        ? templateOptions.find((t) => t.title.toLowerCase() === normalized)
+        : undefined;
+      selectedTemplateId = exactMatch?.id ?? "";
+      // Clamp highlight index to filtered list bounds
+      const filtered = getFilteredTemplates();
+      templateHighlightIndex = filtered.length > 0 ? 0 : -1;
+      renderOptions();
+    });
+
+    searchInput.addEventListener("keydown", (e) => {
+      const filtered = getFilteredTemplates();
+      if (e.key === "ArrowDown") {
+        if (!filtered.length) return;
+        e.preventDefault();
+        templateHighlightIndex = templateHighlightIndex < filtered.length - 1 ? templateHighlightIndex + 1 : 0;
+        renderOptions();
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        if (!filtered.length) return;
+        e.preventDefault();
+        templateHighlightIndex = templateHighlightIndex > 0 ? templateHighlightIndex - 1 : filtered.length - 1;
+        renderOptions();
+        return;
+      }
+      if (e.key === "Enter") {
+        const template = getResolvedTemplate();
+        if (!template) return;
+        e.preventDefault();
+        selectedTemplateId = template.id;
+        templateQuery = template.title;
+        searchInput.value = templateQuery;
+        renderOptions();
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeAll();
+      }
+    });
+
+    async function loadTemplates() {
+      templateLoading = true;
+      templateError = "";
+      renderOptions();
+      const [templateResult, snippetResult] = await Promise.allSettled([
+        getTemplates(),
+        getSnippets(),
+      ]);
+      if (templateResult.status === "fulfilled") {
+        templateOptions = templateResult.value.templates;
+      } else {
+        templateOptions = [];
+        templateError = "Couldn't load templates.";
+      }
+      if (snippetResult.status === "fulfilled") {
+        snippetOptions = snippetResult.value.snippets;
+      } else {
+        snippetOptions = [];
+      }
+      templateLoading = false;
+      const filtered = getFilteredTemplates();
+      templateHighlightIndex = filtered.length > 0 ? 0 : -1;
+      if (selectedTemplateId && !templateOptions.some((t) => t.id === selectedTemplateId)) {
+        selectedTemplateId = "";
+      }
+      renderOptions();
+    }
+
+    dd.appendChild(form);
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+
+    // Reset state and load
+    templateQuery = "";
+    selectedTemplateId = "";
+    templateHighlightIndex = -1;
+    templateActionError = "";
+    searchInput.value = "";
+    loadTemplates().then(() => {
+      searchInput.focus();
+    });
+  }
+
+  // -- Symbols --
+  function showSymbolsDropdown() {
+    const wrap = wrapEls.get("symbols")!;
+    const dd = document.createElement("div");
+    dd.className = "split-dropdown open symbols-dropdown";
+    dd.setAttribute("role", "menu");
+
+    let searchMode = false;
+
+    // Category tabs
+    const tabsRow = document.createElement("div");
+    tabsRow.className = "symbols-tabs";
+
+    const tabButtons: HTMLButtonElement[] = [];
+    for (let i = 0; i < symbolCategories.length; i++) {
+      const cat = symbolCategories[i];
+      const btn = document.createElement("button");
+      btn.className = `symbols-tab${i === activeSymbolCat ? " active" : ""}`;
+      btn.textContent = cat.name;
+      btn.addEventListener("click", () => {
+        searchMode = false;
+        searchInput.value = "";
+        activeSymbolCat = i;
+        for (let j = 0; j < tabButtons.length; j++) {
+          tabButtons[j].classList.toggle("active", j === i);
+        }
+        renderGrid();
+      });
+      tabButtons.push(btn);
+      tabsRow.appendChild(btn);
+    }
+    dd.appendChild(tabsRow);
+
+    // Grid
+    const grid = document.createElement("div");
+    grid.className = "symbols-grid";
+    dd.appendChild(grid);
+
+    function renderGrid(items?: typeof symbolCategories[0]["items"]) {
+      grid.innerHTML = "";
+      const list = items || symbolCategories[activeSymbolCat].items;
+      for (const sym of list) {
+        const btn = document.createElement("button");
+        btn.className = "symbol-btn";
+        if (sym.char.length > 1 && (sym.char.codePointAt(0) ?? 0) < 256) {
+          btn.classList.add("symbol-text");
+        }
+        btn.title = `${sym.label} (${sym.insert})`;
+        btn.textContent = sym.char;
+        btn.addEventListener("click", () => { insertText(sym.insert); closeAll(); });
+        grid.appendChild(btn);
+      }
+      if (list.length === 0) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "grid-column:1/-1;text-align:center;padding:12px;color:var(--asciidoc-placeholder,#888);font-size:12px";
+        empty.textContent = "No symbols found";
+        grid.appendChild(empty);
+      }
+    }
+
+    // Search bar
+    const searchBar = document.createElement("div");
+    searchBar.className = "symbols-search";
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.placeholder = "Search symbols\u2026";
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.trim().toLowerCase();
+      if (query) {
+        searchMode = true;
+        // Deselect all tabs
+        for (const tb of tabButtons) tb.classList.remove("active");
+        // Search across all categories
+        const results: typeof symbolCategories[0]["items"] = [];
+        for (const cat of symbolCategories) {
+          for (const sym of cat.items) {
+            if (sym.label.toLowerCase().includes(query) || sym.char.includes(query) || sym.insert.toLowerCase().includes(query)) {
+              results.push(sym);
+            }
+          }
+        }
+        renderGrid(results);
+      } else {
+        // Clear search — go back to default tab
+        searchMode = false;
+        activeSymbolCat = 0;
+        for (let j = 0; j < tabButtons.length; j++) {
+          tabButtons[j].classList.toggle("active", j === 0);
+        }
+        renderGrid();
+      }
+    });
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "symbols-search-clear";
+    clearBtn.textContent = "\u2715";
+    clearBtn.title = "Clear search";
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      searchMode = false;
+      activeSymbolCat = 0;
+      for (let j = 0; j < tabButtons.length; j++) {
+        tabButtons[j].classList.toggle("active", j === 0);
+      }
+      renderGrid();
+      searchInput.focus();
+    });
+    searchBar.appendChild(searchInput);
+    searchBar.appendChild(clearBtn);
+    dd.appendChild(searchBar);
+
+    renderGrid();
+    wrap.appendChild(dd);
+    positionDropdown(dd);
+  }
+
+  // -----------------------------------------------------------------------
+  // Build the split-button helper
+  // -----------------------------------------------------------------------
+
+  function createSplitButton(
+    stateKey: keyof DropdownState,
+    icon: string,
+    title: string,
+    defaultAction: () => void,
+    arrowTitle: string,
+  ): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "split-btn-wrap";
+    wrapEls.set(stateKey, wrap);
+
+    const mainBtn = document.createElement("button");
+    mainBtn.className = "ribbon-icon-btn";
+    mainBtn.title = title;
+    mainBtn.innerHTML = icon;
+    mainBtn.addEventListener("click", () => {
+      defaultAction();
+      closeAll();
+    });
+
+    const arrow = document.createElement("button");
+    arrow.className = "split-arrow";
+    arrow.title = arrowTitle;
+    arrow.innerHTML = ARROW_SVG;
+    arrow.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggle(stateKey);
+    });
+
+    wrap.appendChild(mainBtn);
+    wrap.appendChild(arrow);
+    return wrap;
+  }
+
+  /** Variant where main button also opens the dropdown instead of a default action. */
+  function createSplitButtonToggle(
+    stateKey: keyof DropdownState,
+    icon: string,
+    title: string,
+    arrowTitle: string,
+  ): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "split-btn-wrap";
+    if (stateKey === "symbols") wrap.classList.add("symbols-wrap");
+    wrapEls.set(stateKey, wrap);
+
+    const mainBtn = document.createElement("button");
+    mainBtn.className = "ribbon-icon-btn";
+    mainBtn.title = title;
+    mainBtn.innerHTML = icon;
+    mainBtn.addEventListener("click", () => toggle(stateKey));
+
+    const arrow = document.createElement("button");
+    arrow.className = "split-arrow";
+    arrow.title = arrowTitle;
+    arrow.innerHTML = ARROW_SVG;
+    arrow.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggle(stateKey);
+    });
+
+    wrap.appendChild(mainBtn);
+    wrap.appendChild(arrow);
+    return wrap;
+  }
+
+  // -----------------------------------------------------------------------
+  // Structure section
+  // -----------------------------------------------------------------------
+
+  const structureRow = document.createElement("div");
+  structureRow.className = "ribbon-row";
+
+  structureRow.appendChild(createSplitButton(
+    "admonition",
+    structureItems[0].icon,
+    "Admonition",
+    () => handleAdmonition("NOTE"),
+    "Admonition type",
+  ));
+
+  structureRow.appendChild(createSplitButton(
+    "source",
+    structureItems[1].icon,
+    "Source Block",
+    () => handleSource("javascript"),
+    "Language",
+  ));
+
+  structureRow.appendChild(createSplitButton(
+    "table",
+    structureItems[2].icon,
+    "Table",
+    () => { handleTable(tableRows, tableCols); },
+    "Table size",
+  ));
+
+  structureRow.appendChild(createSplitButton(
+    "blocks",
+    structureItems[3].icon,
+    "Content Block",
+    () => handleBlock("sidebar"),
+    "Block type",
+  ));
+
+  wrapper.appendChild(createRibbonSection("Structure", structureRow));
+
+  // -----------------------------------------------------------------------
+  // Lists section
+  // -----------------------------------------------------------------------
+
+  const listsRow = document.createElement("div");
+  listsRow.className = "ribbon-row";
+  for (const item of listItems) {
+    const btn = document.createElement("button");
+    btn.className = "ribbon-icon-btn";
+    btn.title = item.title;
+    btn.innerHTML = item.icon;
+    btn.addEventListener("click", () => item.action());
+    listsRow.appendChild(btn);
+  }
+  wrapper.appendChild(createRibbonSection("Lists", listsRow));
+
+  // -----------------------------------------------------------------------
+  // Diagrams section
+  // -----------------------------------------------------------------------
+
+  const diagramRow = document.createElement("div");
+  diagramRow.className = "ribbon-row";
+  diagramRow.appendChild(createSplitButton(
+    "diagram",
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="8" y="14" width="7" height="7" rx="1"/><line x1="6.5" y1="10" x2="11.5" y2="14"/><line x1="17.5" y1="10" x2="11.5" y2="14"/></svg>`,
+    "Insert Mermaid Diagram",
+    () => { handleMermaid("flowchart"); closeAll(); },
+    "Diagram type",
+  ));
+  wrapper.appendChild(createRibbonSection("Diagrams", diagramRow));
+
+  // -----------------------------------------------------------------------
+  // Content section
+  // -----------------------------------------------------------------------
+
+  const contentRow = document.createElement("div");
+  contentRow.className = "ribbon-row";
+  for (const item of contentItems) {
+    const btn = document.createElement("button");
+    btn.className = "ribbon-icon-btn";
+    btn.title = item.title;
+    btn.innerHTML = item.icon;
+    btn.addEventListener("click", () => item.action());
+    contentRow.appendChild(btn);
+  }
+  wrapper.appendChild(createRibbonSection("Content", contentRow));
+
+  // -----------------------------------------------------------------------
+  // Math section
+  // -----------------------------------------------------------------------
+
+  const mathRow = document.createElement("div");
+  mathRow.className = "ribbon-row";
+
+  mathRow.appendChild(createSplitButton(
+    "math",
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><text x="4" y="18" font-size="16" font-family="serif" font-style="italic" fill="currentColor" stroke="none">\u03A3</text></svg>`,
+    "Insert Inline Math",
+    () => { handleMath("latexmath", false); closeAll(); },
+    "Math options",
+  ));
+
+  wrapper.appendChild(createRibbonSection("Math", mathRow));
+
+  // -----------------------------------------------------------------------
+  // Media section
+  // -----------------------------------------------------------------------
+
+  const mediaRow = document.createElement("div");
+  mediaRow.className = "ribbon-row";
+
+  mediaRow.appendChild(createSplitButtonToggle(
+    "image",
+    mediaItems[0].icon,
+    "Image",
+    "Image options",
+  ));
+
+  mediaRow.appendChild(createSplitButtonToggle(
+    "video",
+    mediaItems[1].icon,
+    "Video",
+    "Video options",
+  ));
+
+  mediaRow.appendChild(createSplitButtonToggle(
+    "audio",
+    mediaItems[2].icon,
+    "Audio",
+    "Audio options",
+  ));
+
+  mediaRow.appendChild(createSplitButtonToggle(
+    "link",
+    mediaItems[3].icon,
+    "Link",
+    "Link options",
+  ));
+
+  wrapper.appendChild(createRibbonSection("Media", mediaRow));
+
+  // -----------------------------------------------------------------------
+  // Templates section
+  // -----------------------------------------------------------------------
+
+  const templatesRow = document.createElement("div");
+  templatesRow.className = "ribbon-row";
+
+  templatesRow.appendChild(createSplitButtonToggle(
+    "template",
+    mediaItems[4].icon,
+    "Template",
+    "Template options",
+  ));
+
+  wrapper.appendChild(createRibbonSection("Templates", templatesRow));
+
+  // -----------------------------------------------------------------------
+  // Symbols section
+  // -----------------------------------------------------------------------
+
+  const symbolsRow = document.createElement("div");
+  symbolsRow.className = "ribbon-row symbols-row";
+
+  symbolsRow.appendChild(createSplitButtonToggle(
+    "symbols",
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>`,
+    "Insert Symbol",
+    "Browse symbols",
+  ));
+
+  wrapper.appendChild(createRibbonSection("Symbols", symbolsRow));
+
+  return {
+    element: wrapper,
+    cleanup: () => {
+      window.removeEventListener("mousedown", handleWindowClick, true);
+    },
+  };
+}
