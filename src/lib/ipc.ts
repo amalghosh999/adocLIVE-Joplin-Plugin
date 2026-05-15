@@ -89,10 +89,6 @@ export async function markAsTemplate(): Promise<void> {
   await webviewApi.postMessage({ type: "markAsTemplate" });
 }
 
-export async function unmarkTemplate(): Promise<void> {
-  await webviewApi.postMessage({ type: "unmarkTemplate" });
-}
-
 export async function removeTemplate(noteId: string): Promise<void> {
   await webviewApi.postMessage({ type: "removeTemplate", noteId });
 }

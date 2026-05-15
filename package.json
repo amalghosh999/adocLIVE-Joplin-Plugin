@@ -6,9 +6,9 @@
   "author": "Amal Ghosh <amalghosh999@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/amalghosh999/adocLIVE-joplin-plugin.git"
+    "url": "https://github.com/amalghosh999/joplin-asciidoc-plugin.git"
   },
-  "homepage": "https://github.com/amalghosh999/adocLIVE-joplin-plugin",
+  "homepage": "https://github.com/amalghosh999/joplin-asciidoc-plugin",
   "keywords": [
     "joplin-plugin"
   ],
@@ -20,7 +20,7 @@
     "build:bundle": "webpack --mode=production",
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('com.asciidoc.joplin-plugin.jpl',{force:true});\"",
     "build:jpl": "npm run clean && npm run build:bundle && cd dist && tar -czf ../com.asciidoc.joplin-plugin.jpl *",
-    "deploy:joplin": "npm run build:jpl && cp com.asciidoc.joplin-plugin.jpl ~/.config/joplindev-desktop/plugins/ 2>/dev/null; cp com.asciidoc.joplin-plugin.jpl ~/.config/joplin-desktop/plugins/ 2>/dev/null; rm -rf ~/.config/joplindev-desktop/cache/com.asciidoc.joplin-plugin/ 2>/dev/null; rm -rf ~/.config/joplin-desktop/cache/com.asciidoc.joplin-plugin/ 2>/dev/null; echo 'Deployed to Joplin'",
+    "deploy:joplin": "npm run build:jpl && node scripts/deploy-joplin.js",
     "typecheck": "tsc --noEmit --pretty false",
     "test:unit": "vitest run",
     "prepublishOnly": "npm run build:jpl && mkdir -p publish && cp com.asciidoc.joplin-plugin.jpl publish/",

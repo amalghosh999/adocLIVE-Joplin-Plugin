@@ -759,7 +759,7 @@ function setFullscreen(enabled: boolean) {
   // Toggle Joplin sidebars via IPC
   setFullscreenMode(enabled).catch(e => console.error("[panel] Failed to toggle fullscreen sidebars:", e));
   // Sync the editor panel checkbox if it's currently visible
-  root.querySelectorAll<HTMLInputElement>(".ribbon-panel .editor-toggle-label input[type=checkbox]").forEach(checkbox => {
+  root.querySelectorAll<HTMLInputElement>(".ribbon-panel .ribbon-toggle input[type=checkbox]").forEach(checkbox => {
     const label = checkbox.nextElementSibling?.textContent;
     if (label === "Fullscreen Mode" && checkbox.checked !== enabled) {
       checkbox.checked = enabled;

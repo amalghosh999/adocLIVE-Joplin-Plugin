@@ -17,6 +17,7 @@ import { getBiblioLabels } from "./live-preview";
 interface AutocompleteResult {
   id: string;
   title: string;
+  isAsciiDoc: boolean;
 }
 
 interface Section {
@@ -58,7 +59,7 @@ async function handleNoteCompletion(
   let results: AutocompleteResult[];
   try {
     const response = await searchNotes(query.trim(), "autocomplete", getCurrentNoteId());
-    results = response.notes.map(n => ({ id: n.id, title: n.title }));
+    results = response.notes.map(n => ({ id: n.id, title: n.title, isAsciiDoc: n.isAsciiDoc }));
   } catch (e) {
     console.error("[WikiLink] autocomplete search failed:", e);
     results = [];
@@ -71,7 +72,7 @@ async function handleNoteCompletion(
   // Build note link options
   const noteOptions: Completion[] = results.map((note) => ({
     label: note.title,
-    detail: "Joplin note",
+    detail: note.isAsciiDoc ? "adocLIVE note" : "Joplin note",
     type: "variable",
     section: "Notes",
     apply: (view: any, _completion: any, _from: number, to: number) => {

@@ -75,6 +75,6 @@ npm publish
 echo ""
 echo "Done! Released v$NEW_VERSION"
 echo "  - Git tag: v$NEW_VERSION"
-echo "  - GitHub release: https://github.com/amalghosh999/adocLIVE-joplin-plugin/releases/tag/v$NEW_VERSION"
+echo "  - GitHub release: https://github.com/amalghosh999/joplin-asciidoc-plugin/releases/tag/v$NEW_VERSION"
 echo "  - npm: https://www.npmjs.com/package/com.asciidoc.joplin-plugin"
 echo "  - Joplin plugin directory will pick it up within ~30 minutes"

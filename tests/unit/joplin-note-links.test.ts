@@ -13,12 +13,24 @@ describe("Joplin note link candidates", () => {
     expect(isAsciiDocNoteBody("# Markdown note")).toBe(false);
   });
 
-  it("keeps only other AsciiDoc notes and never returns the current note", () => {
+  it("keeps other Joplin notes and never returns the current note", () => {
     const results = filterJoplinNoteLinkCandidates([
       { id: "current", title: "Current", body: `= Current${ADOC_SENTINEL}`, updated_time: 5 },
       { id: "adoc", title: "AsciiDoc", body: `= AsciiDoc${ADOC_SENTINEL}`, updated_time: 4 },
       { id: "markdown", title: "Markdown", body: "# Markdown", updated_time: 3 },
     ], { currentNoteId: "current" });
+
+    expect(results).toEqual([
+      { id: "adoc", title: "AsciiDoc", isAsciiDoc: true },
+      { id: "markdown", title: "Markdown", isAsciiDoc: false },
+    ]);
+  });
+
+  it("can restrict candidates to adocLIVE notes for include targets", () => {
+    const results = filterJoplinNoteLinkCandidates([
+      { id: "adoc", title: "AsciiDoc", body: `= AsciiDoc${ADOC_SENTINEL}`, updated_time: 4 },
+      { id: "markdown", title: "Markdown", body: "# Markdown", updated_time: 3 },
+    ], { asciiDocOnly: true });
 
     expect(results).toEqual([
       { id: "adoc", title: "AsciiDoc", isAsciiDoc: true },

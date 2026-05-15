@@ -15,6 +15,7 @@ export interface JoplinNoteLinkFilterOptions {
   currentNoteId?: string;
   query?: string;
   limit?: number;
+  asciiDocOnly?: boolean;
 }
 
 export function isAsciiDocNoteBody(body: unknown): boolean {
@@ -47,10 +48,11 @@ export function filterJoplinNoteLinkCandidates(
   const currentNoteId = normalizeSearchText(options.currentNoteId);
   const query = normalizeSearchText(options.query);
   const limit = Math.max(1, Math.min(100, Math.floor(options.limit || 20)));
+  const asciiDocOnly = options.asciiDocOnly === true;
 
   return candidates
     .filter(note => normalizeSearchText(note.id) !== currentNoteId)
-    .filter(note => isAsciiDocNoteBody(note.body))
+    .filter(note => !asciiDocOnly || isAsciiDocNoteBody(note.body))
     .map(note => ({ note, rank: matchRank(note, query) }))
     .filter(entry => Number.isFinite(entry.rank))
     .sort((a, b) => {
@@ -64,6 +66,6 @@ export function filterJoplinNoteLinkCandidates(
     .map(({ note }) => ({
       id: note.id,
       title: noteTitle(note),
-      isAsciiDoc: true,
+      isAsciiDoc: isAsciiDocNoteBody(note.body),
     }));
 }

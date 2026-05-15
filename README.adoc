@@ -10,7 +10,7 @@ Requires *Joplin 3.1+* (desktop only).
 * *Ribbon toolbar* -- four tabbed panels (Text, Insert, Advanced, View) with one-click access to every AsciiDoc construct
 * *Block editing* -- click any rendered table, code block, image, diagram, or blockquote to edit it in a focused modal or inline
 * *Markdown conversion* -- convert existing Markdown notes to AsciiDoc with a single command
-* *Wiki-links & cross-references* -- `+<<noteId,Display Text>>+` links to other AsciiDoc notes in the current Joplin notebook with autocomplete
+* *Wiki-links & cross-references* -- `+<<noteId,Display Text>>+` links to other notes in the current Joplin notebook with autocomplete
 * *Author line* -- author name and email rendered as a byline under the document title, with implicit attribute generation
 * *Attribute autocomplete* -- type `+{+` to autocomplete document attributes defined in the header
 * *Template system* -- save and reuse note templates, plus persistent snippet templates with `@@` inline autocomplete
@@ -39,23 +39,23 @@ npm run build
 . Install the generated `com.asciidoc.joplin-plugin.jpl` file in Joplin, or run `npm run deploy:joplin` to copy it into the local Joplin desktop plugin folders and clear the plugin cache.
 . *Restart Joplin* (Cmd+Q / Ctrl+Q, then reopen) -- plugins only load on startup.
 
-=== Creating an AsciiDoc Note
+=== Creating an adocLIVE Note
 
-To have all new notes created as AsciiDoc by default, enable *"Create new notes as AsciiDoc"* in *Preferences > AsciiDoc*.
+To have all new notes created as adocLIVE notes by default, enable *"Create new notes as adocLIVE"* in *Preferences > adocLIVE*.
 
-You can also convert existing notes or create AsciiDoc notes on demand:
+You can also convert existing notes or create adocLIVE notes on demand:
 
-* *Tools > New AsciiDoc Note* -- creates a blank AsciiDoc note
-* *Tools > Convert to AsciiDoc Note* -- converts the current Markdown note in place
-* *Tools > Convert to AsciiDoc Note (new file)* -- creates an AsciiDoc copy, keeping the original
-* *Right-click a note > Create AsciiDoc Copy* -- convert from the note list
-* *Right-click a note > Replace with AsciiDoc File* -- convert in place from the note list
-* *Note toolbar button: "Make AsciiDoc"* -- one-click convert for the current note
+* *Tools > New adocLIVE Note* -- creates a blank adocLIVE note
+* *Tools > Convert to adocLIVE Note* -- converts the current Markdown note in place
+* *Tools > Convert to adocLIVE Note (new note)* -- creates an adocLIVE copy, keeping the original
+* *Right-click a note > Create adocLIVE Copy* -- convert or copy from the note list; multi-note selections are supported
+* *Right-click a note > Replace with adocLIVE Note* -- convert in place from the note list; multi-note selections are supported
+* *Note toolbar button: "Make adocLIVE"* -- one-click convert for the current note
 
 === Converting Entire Notebooks
 
-* *Right-click a notebook > Create AsciiDoc Copy of Notebook* -- recursively convert all notes in the notebook to AsciiDoc copies
-* *Right-click a notebook > Replace with AsciiDoc Notebook* -- recursively convert all notes in the notebook in place
+* *Right-click a notebook > Create adocLIVE Copy of Notebook* -- recursively convert all notes in the notebook to adocLIVE copies
+* *Right-click a notebook > Replace with adocLIVE Notebook* -- recursively convert all notes in the notebook in place
 
 '''
 
@@ -378,7 +378,7 @@ When right-clicking a misspelled word, additional options appear:
 
 == Wiki-Links & Autocomplete
 
-Type `+<<+` to trigger Joplin note autocomplete -- recent AsciiDoc notes from the current Joplin notebook appear immediately, and results filter as you type. Bibliography entries from the current note are also shown in a separate group. Select a note to insert a cross-reference link.
+Type `+<<+` to trigger Joplin note autocomplete -- recent notes from the current Joplin notebook appear immediately, and results filter as you type. Bibliography entries from the current note are also shown in a separate group. Select a note to insert a cross-reference link.
 
 After selecting a note, type `+#+` to drill into its sections. The autocomplete shows heading levels (h2, h3, etc.) with indentation, letting you link directly to a specific section.
 
@@ -433,15 +433,15 @@ When converting a Markdown note to AsciiDoc, the plugin automatically converts:
 
 === Plugin Settings
 
-In *Preferences > AsciiDoc*:
+In *Preferences > adocLIVE*:
 
 [cols="1,1,3"]
 |===
 | Setting | Default | Description
 
-| Create new notes as AsciiDoc
+| Create new notes as adocLIVE
 | Off
-| Automatically convert newly created notes to AsciiDoc
+| Automatically convert newly created notes to adocLIVE notes
 
 | Compact Spacing
 | Off

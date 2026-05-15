@@ -12,6 +12,7 @@ import {
   isAsciiDocNoteBody,
   type JoplinNoteLinkCandidate,
 } from "./shared/joplin-note-links";
+import { normalizeNoteIdsFromCommandArgs } from "./shared/joplin-command-args";
 
 // Joplin MenuItemLocation values (defined locally to avoid requiring api/types at runtime)
 const MenuItemLocation = {
@@ -137,7 +138,12 @@ async function fetchJoplinFolderNotes(folderId: string): Promise<JoplinNoteLinkC
   return notes;
 }
 
-async function searchJoplinAsciiDocNotesInActiveFolder(fromNoteId: string, query: string, limit: number) {
+async function searchJoplinNotesInActiveFolder(
+  fromNoteId: string,
+  query: string,
+  limit: number,
+  options: { asciiDocOnly?: boolean } = {},
+) {
   const folderId = await getActiveJoplinFolderId(fromNoteId);
   if (!folderId) return [];
   const notes = await fetchJoplinFolderNotes(folderId);
@@ -145,6 +151,7 @@ async function searchJoplinAsciiDocNotesInActiveFolder(fromNoteId: string, query
     currentNoteId: fromNoteId,
     query,
     limit,
+    asciiDocOnly: options.asciiDocOnly === true,
   });
 }
 
@@ -1062,17 +1069,68 @@ async function replaceNotebookWithAsciiDoc(folderId: string) {
 
 let attributesDialog: any = null;
 
+async function noteIdsFromCommandArgs(args: unknown[]): Promise<string[]> {
+  const noteIds = normalizeNoteIdsFromCommandArgs(args);
+  if (noteIds.length > 0) return noteIds;
+
+  const selected = await joplin.workspace.selectedNote();
+  return selected?.id ? [selected.id] : [];
+}
+
+async function reloadNoteWithEditor(noteId: string, parentId: string) {
+  const tmp = await joplin.data.post(["notes"], null, {
+    parent_id: parentId,
+    title: ".tmp-adoclive-convert",
+    body: "",
+  });
+  try {
+    await joplin.commands.execute("openNote", tmp.id);
+  } finally {
+    await joplin.data.delete(["notes", tmp.id]);
+  }
+  await joplin.commands.execute("openNote", noteId);
+}
+
+async function createAdocLiveCopy(noteId: string): Promise<string | null> {
+  const note = await joplin.data.get(["notes", noteId], {
+    fields: ["id", "title", "body", "parent_id"],
+  });
+  if (!note) return null;
+
+  const body = isAsciiDocNote(note.body)
+    ? note.body
+    : appendSentinel(convertMarkdownToAsciidoc(note.body), {});
+  const copy = await joplin.data.post(["notes"], null, {
+    parent_id: note.parent_id,
+    title: `${note.title || "Untitled"} (adocLIVE)`,
+    body,
+  });
+  return copy.id || null;
+}
+
+async function replaceNoteWithAdocLive(noteId: string): Promise<{ id: string; parentId: string } | null> {
+  const note = await joplin.data.get(["notes", noteId], {
+    fields: ["id", "body", "parent_id"],
+  });
+  if (!note || isAsciiDocNote(note.body)) return null;
+
+  const converted = convertMarkdownToAsciidoc(note.body);
+  const newBody = appendSentinel(converted, {});
+  await joplin.data.put(["notes", note.id], null, { body: newBody });
+  return { id: note.id, parentId: note.parent_id };
+}
+
 async function registerCommands() {
   await joplin.commands.register({
     name: "asciidoc.createNote",
-    label: "New AsciiDoc Note",
+    label: "New adocLIVE Note",
     iconName: "fas fa-file-alt",
     execute: async () => {
       const folder = await joplin.workspace.selectedFolder();
       const note = await joplin.data.post(["notes"], null, {
         parent_id: folder.id,
-        title: "New AsciiDoc Note",
-        body: "= New AsciiDoc Note\n\nStart writing here...\n\n```asciidoc-settings\n{}\n```\n",
+        title: "New adocLIVE Note",
+        body: "= New adocLIVE Note\n\nStart writing here...\n\n```asciidoc-settings\n{}\n```\n",
       });
       setTimeout(async () => {
         await joplin.commands.execute("openNote", note.id);
@@ -1085,51 +1143,27 @@ async function registerCommands() {
 
   await joplin.commands.register({
     name: "asciidoc.convertCurrentNote",
-    label: "Convert to AsciiDoc Note",
+    label: "Convert to adocLIVE Note",
     iconName: "fas fa-exchange-alt",
     execute: async () => {
       const selected = await joplin.workspace.selectedNote();
       if (!selected) return;
-      const note = await joplin.data.get(["notes", selected.id], {
-        fields: ["id", "body", "parent_id"],
-      });
-      if (!note || isAsciiDocNote(note.body)) return;
-      const converted = convertMarkdownToAsciidoc(note.body);
-      const newBody = appendSentinel(converted, {});
-      await joplin.data.put(["notes", note.id], null, { body: newBody });
-      // Force refresh by navigating away and back
-      const tmp = await joplin.data.post(["notes"], null, {
-        parent_id: note.parent_id,
-        title: ".tmp-asciidoc-convert",
-        body: "",
-      });
-      await joplin.commands.execute("openNote", tmp.id);
-      await joplin.data.delete(["notes", tmp.id]);
-      await joplin.commands.execute("openNote", note.id);
+      const replaced = await replaceNoteWithAdocLive(selected.id);
+      if (replaced) await reloadNoteWithEditor(replaced.id, replaced.parentId);
     },
   });
 
   await joplin.commands.register({
     name: "asciidoc.convertCurrentNoteCopy",
-    label: "Convert to AsciiDoc Note (new file)",
+    label: "Convert to adocLIVE Note (new note)",
     iconName: "fas fa-copy",
     execute: async () => {
       const selected = await joplin.workspace.selectedNote();
       if (!selected) return;
-      const note = await joplin.data.get(["notes", selected.id], {
-        fields: ["id", "title", "body", "parent_id"],
-      });
-      if (!note) return;
-      const body = isAsciiDocNote(note.body)
-        ? note.body
-        : appendSentinel(convertMarkdownToAsciidoc(note.body), {});
-      const copy = await joplin.data.post(["notes"], null, {
-        parent_id: note.parent_id,
-        title: note.title + " (AsciiDoc)",
-        body,
-      });
+      const copyId = await createAdocLiveCopy(selected.id);
+      if (!copyId) return;
       setTimeout(async () => {
-        await joplin.commands.execute("openNote", copy.id);
+        await joplin.commands.execute("openNote", copyId);
       }, 100);
     },
   });
@@ -1188,90 +1222,53 @@ async function registerCommands() {
     },
   });
 
-  // "Create AsciiDoc Copy" — available in note list right-click menu
+  // "Create adocLIVE Copy" — available in note list right-click menu.
   await joplin.commands.register({
     name: "asciidoc.createAsciiDocCopy",
-    label: "Create AsciiDoc Copy",
+    label: "Create adocLIVE Copy",
     iconName: "fas fa-copy",
-    execute: async () => {
-      const selected = await joplin.workspace.selectedNote();
-      if (!selected) return;
-      const note = await joplin.data.get(["notes", selected.id], {
-        fields: ["id", "title", "body", "parent_id"],
-      });
-      if (!note) return;
-      // Already an AsciiDoc note — just open it
-      if (isAsciiDocNote(note.body)) {
-        await joplin.commands.execute("openNote", note.id);
-        return;
+    execute: async (...args: any[]) => {
+      const noteIds = await noteIdsFromCommandArgs(args);
+      let lastCopyId = "";
+      for (const noteId of noteIds) {
+        const copyId = await createAdocLiveCopy(noteId);
+        if (copyId) lastCopyId = copyId;
       }
-      // Create a new AsciiDoc copy with converted headings and sentinel
-      const converted = convertMarkdownToAsciidoc(note.body);
-      const body = appendSentinel(converted, {});
-      const copy = await joplin.data.post(["notes"], null, {
-        parent_id: note.parent_id,
-        title: note.title + " (AsciiDoc)",
-        body,
-      });
-      setTimeout(async () => {
-        await joplin.commands.execute("openNote", copy.id);
-      }, 100);
+      if (lastCopyId) {
+        const noteToOpen = lastCopyId;
+        setTimeout(async () => {
+          await joplin.commands.execute("openNote", noteToOpen);
+        }, 100);
+      }
     },
   });
 
-  // "Replace with AsciiDoc File" — converts note in-place from note list right-click menu
+  // "Replace with adocLIVE Note" — converts note in-place from note list right-click menu.
   await joplin.commands.register({
     name: "asciidoc.replaceWithAsciiDoc",
-    label: "Replace with AsciiDoc File",
+    label: "Replace with adocLIVE Note",
     iconName: "fas fa-exchange-alt",
-    execute: async () => {
-      const selected = await joplin.workspace.selectedNote();
-      if (!selected) return;
-      const note = await joplin.data.get(["notes", selected.id], {
-        fields: ["id", "body", "parent_id"],
-      });
-      if (!note) return;
-      if (isAsciiDocNote(note.body)) return;
-      const converted = convertMarkdownToAsciidoc(note.body);
-      const newBody = appendSentinel(converted, {});
-      await joplin.data.put(["notes", note.id], null, { body: newBody });
-      // Force refresh by navigating away and back
-      const tmp = await joplin.data.post(["notes"], null, {
-        parent_id: note.parent_id,
-        title: ".tmp-asciidoc-convert",
-        body: "",
-      });
-      await joplin.commands.execute("openNote", tmp.id);
-      await joplin.data.delete(["notes", tmp.id]);
-      await joplin.commands.execute("openNote", note.id);
+    execute: async (...args: any[]) => {
+      const noteIds = await noteIdsFromCommandArgs(args);
+      let lastReplaced: { id: string; parentId: string } | null = null;
+      for (const noteId of noteIds) {
+        const replaced = await replaceNoteWithAdocLive(noteId);
+        if (replaced) lastReplaced = replaced;
+      }
+      if (lastReplaced) await reloadNoteWithEditor(lastReplaced.id, lastReplaced.parentId);
     },
   });
 
-  // "Make this note AsciiDoc" — converts current note in-place, shown as toolbar button
+  // "Make adocLIVE" — converts current note in-place, shown as toolbar button.
   await joplin.commands.register({
     name: "asciidoc.makeCurrentNoteAsciiDoc",
-    label: "Make AsciiDoc",
+    label: "Make adocLIVE",
     iconName: "fas fa-file-alt",
     execute: async () => {
       const selected = await joplin.workspace.selectedNote();
       if (!selected) return;
-      const note = await joplin.data.get(["notes", selected.id], {
-        fields: ["id", "body", "parent_id"],
-      });
-      if (!note) return;
-      if (isAsciiDocNote(note.body)) return; // Already AsciiDoc
-      const converted = convertMarkdownToAsciidoc(note.body);
-      const newBody = appendSentinel(converted, {});
-      await joplin.data.put(["notes", note.id], null, { body: newBody });
-      // Force Joplin to reload the note with the custom editor
-      const tmp = await joplin.data.post(["notes"], null, {
-        parent_id: note.parent_id,
-        title: ".tmp-asciidoc-convert",
-        body: "",
-      });
-      await joplin.commands.execute("openNote", tmp.id);
-      await joplin.data.delete(["notes", tmp.id]);
-      await joplin.commands.execute("openNote", note.id);
+      const replaced = await replaceNoteWithAdocLive(selected.id);
+      if (replaced) await reloadNoteWithEditor(replaced.id, replaced.parentId);
     },
   });
 
@@ -1295,48 +1292,48 @@ async function registerCommands() {
   // Notebook (folder) conversion commands
   await joplin.commands.register({
     name: "asciidoc.copyNotebookAsAsciiDoc",
-    label: "Create AsciiDoc Copy of Notebook",
+    label: "Create adocLIVE Copy of Notebook",
     iconName: "fas fa-copy",
     execute: async (...args: any[]) => {
       try {
         // Folder ID may be passed as argument from context menu, or fall back to selected folder
         const folderId = args[0] || (await joplin.workspace.selectedFolder())?.id;
         if (!folderId) {
-          console.error("[AsciiDoc] copyNotebook: no folder ID available");
+          console.error("[adocLIVE] copyNotebook: no folder ID available");
           return;
         }
         const folderData = await joplin.data.get(["folders", folderId], {
           fields: ["id", "title", "parent_id"],
         });
         if (!folderData) {
-          console.error("[AsciiDoc] copyNotebook: folder not found:", folderId);
+          console.error("[adocLIVE] copyNotebook: folder not found:", folderId);
           return;
         }
-        console.info("[AsciiDoc] Creating AsciiDoc copy of notebook:", folderData.title);
-        await copyNotebookAsAsciiDoc(folderData.id, folderData.parent_id || "", folderData.title + " (AsciiDoc)");
-        console.info("[AsciiDoc] Notebook copy complete");
+        console.info("[adocLIVE] Creating AsciiDoc copy of notebook:", folderData.title);
+        await copyNotebookAsAsciiDoc(folderData.id, folderData.parent_id || "", folderData.title + " (adocLIVE)");
+        console.info("[adocLIVE] Notebook copy complete");
       } catch (e) {
-        console.error("[AsciiDoc] copyNotebook failed:", e);
+        console.error("[adocLIVE] copyNotebook failed:", e);
       }
     },
   });
 
   await joplin.commands.register({
     name: "asciidoc.replaceNotebookWithAsciiDoc",
-    label: "Replace with AsciiDoc Notebook",
+    label: "Replace with adocLIVE Notebook",
     iconName: "fas fa-exchange-alt",
     execute: async (...args: any[]) => {
       try {
         const folderId = args[0] || (await joplin.workspace.selectedFolder())?.id;
         if (!folderId) {
-          console.error("[AsciiDoc] replaceNotebook: no folder ID available");
+          console.error("[adocLIVE] replaceNotebook: no folder ID available");
           return;
         }
-        console.info("[AsciiDoc] Replacing notebook with AsciiDoc:", folderId);
+        console.info("[adocLIVE] Replacing notebook with AsciiDoc:", folderId);
         await replaceNotebookWithAsciiDoc(folderId);
-        console.info("[AsciiDoc] Notebook replacement complete");
+        console.info("[adocLIVE] Notebook replacement complete");
       } catch (e) {
-        console.error("[AsciiDoc] replaceNotebook failed:", e);
+        console.error("[adocLIVE] replaceNotebook failed:", e);
       }
     },
   });
@@ -1367,8 +1364,8 @@ async function registerSettings() {
       public: true,
       type: 3, // Boolean
       value: false,
-      label: "Create new notes as AsciiDoc",
-      description: "When enabled, new notes will automatically be created as AsciiDoc notes with the Live Preview editor.",
+      label: "Create new notes as adocLIVE",
+      description: "When enabled, new notes will automatically be created as adocLIVE notes with the Live Preview editor.",
     },
     "asciidoc.compactSpacing": {
       section: "asciidoc",
@@ -1452,23 +1449,23 @@ async function registerSettings() {
 
 joplin.plugins.register({
   onStart: async function () {
-    console.info("[AsciiDoc] Plugin onStart called");
+    console.info("[adocLIVE] Plugin onStart called");
     try {
     await registerSettings();
     await registerCommands();
-    console.info("[AsciiDoc] Commands and settings registered");
+    console.info("[adocLIVE] Commands and settings registered");
 
     let templateTagId: string;
     try {
       templateTagId = await ensureTemplateTag();
     } catch (e) {
-      console.error("[AsciiDoc] Failed to ensure template tag:", e);
+      console.error("[adocLIVE] Failed to ensure template tag:", e);
       templateTagId = "";
     }
 
     const editors = (joplin.views as any).editors;
     if (!editors) {
-      console.error("[AsciiDoc] joplin.views.editors not available — custom editor requires Joplin 3.1+");
+      console.error("[adocLIVE] joplin.views.editors not available — custom editor requires Joplin 3.1+");
       return;
     }
     let currentNoteId: string | null = null;
@@ -1740,7 +1737,7 @@ joplin.plugins.register({
             try {
               const query = (msg.query || "").trim();
               const fromNoteId = await getCurrentNoteIdFallback(msg.fromNoteId || currentNoteId || "");
-              const notes = await searchJoplinAsciiDocNotesInActiveFolder(fromNoteId, query, 20);
+              const notes = await searchJoplinNotesInActiveFolder(fromNoteId, query, 20);
               return { notes };
             } catch {
               return { notes: [] };
@@ -1752,7 +1749,7 @@ joplin.plugins.register({
             try {
               const query = (msg.query || "").replace(/^joplin:/i, "").trim();
               const fromNoteId = await getCurrentNoteIdFallback(msg.fromNoteId || currentNoteId || "");
-              const noteTargets = (await searchJoplinAsciiDocNotesInActiveFolder(fromNoteId, query, 25))
+              const noteTargets = (await searchJoplinNotesInActiveFolder(fromNoteId, query, 25, { asciiDocOnly: true }))
                 .map((note) => ({
                   id: note.id,
                   title: note.title || note.id,
@@ -1866,16 +1863,6 @@ joplin.plugins.register({
             }
           }
 
-          // Unmark template
-          if (msg.type === "unmarkTemplate" && currentNoteId) {
-            try {
-              await joplin.data.delete(["tags", templateTagId, "notes", currentNoteId]);
-              return { status: "ok" };
-            } catch {
-              return { status: "error" };
-            }
-          }
-
           // Remove a specific note from templates by ID
           if (msg.type === "removeTemplate" && msg.noteId) {
             try {
@@ -1923,7 +1910,7 @@ joplin.plugins.register({
               }
               return { status: "ok" };
             } catch (e) {
-              console.error("[AsciiDoc] Failed to save dictionary word:", e);
+              console.error("[adocLIVE] Failed to save dictionary word:", e);
               return { status: "error" };
             }
           }
@@ -1952,7 +1939,7 @@ joplin.plugins.register({
               await joplin.settings.setValue("asciidoc.snippetTemplates", JSON.stringify(snippets));
               return { status: "ok", snippet };
             } catch (e) {
-              console.error("[AsciiDoc] Failed to save snippet:", e);
+              console.error("[adocLIVE] Failed to save snippet:", e);
               return { status: "error", error: "Failed to save snippet" };
             }
           }
@@ -1972,7 +1959,7 @@ joplin.plugins.register({
               await joplin.settings.setValue("asciidoc.snippetTemplates", JSON.stringify(snippets));
               return { status: "ok" };
             } catch (e) {
-              console.error("[AsciiDoc] Failed to update snippet:", e);
+              console.error("[adocLIVE] Failed to update snippet:", e);
               return { status: "error", error: "Failed to update snippet" };
             }
           }
@@ -1985,7 +1972,7 @@ joplin.plugins.register({
               await joplin.settings.setValue("asciidoc.snippetTemplates", JSON.stringify(filtered));
               return { status: "ok" };
             } catch (e) {
-              console.error("[AsciiDoc] Failed to remove snippet:", e);
+              console.error("[adocLIVE] Failed to remove snippet:", e);
               return { status: "error" };
             }
           }
@@ -2027,7 +2014,7 @@ joplin.plugins.register({
               }
               return { status: "ok" };
             } catch (e) {
-              console.error("[AsciiDoc] Failed to toggle fullscreen:", e);
+              console.error("[adocLIVE] Failed to toggle fullscreen:", e);
               return { status: "error" };
             }
           }
@@ -2081,7 +2068,7 @@ joplin.plugins.register({
       },
     } as any);
     } catch (e) {
-      console.error("[AsciiDoc] Failed to register custom editor:", e);
+      console.error("[adocLIVE] Failed to register custom editor:", e);
     }
     // Auto-convert new notes to AsciiDoc when setting is enabled.
     // Uses a debounce + lock to prevent loops. No temp notes.
@@ -2126,7 +2113,7 @@ joplin.plugins.register({
         // Re-open the same note so Joplin re-evaluates which editor to use
         await joplin.commands.execute("openNote", noteId);
       } catch (e) {
-        console.error("[AsciiDoc] Auto-convert failed:", e);
+        console.error("[adocLIVE] Auto-convert failed:", e);
       } finally {
         // Release lock after a delay to let Joplin settle
         setTimeout(() => { autoConvertLock = false; }, 1000);
@@ -2134,7 +2121,7 @@ joplin.plugins.register({
     });
 
     } catch (e) {
-      console.error("[AsciiDoc] Plugin onStart failed:", e);
+      console.error("[adocLIVE] Plugin onStart failed:", e);
     }
   },
 });
