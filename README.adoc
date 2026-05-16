@@ -6,7 +6,7 @@ Requires *Joplin 3.1+* (desktop only).
 
 == Features at a Glance
 
-* *Live preview* -- AsciiDoc renders inline as you type, powered by CodeMirror 6 and Asciidoctor.js
+* *Live preview* -- AsciiDoc renders inline as you type, powered by CodeMirror 6, with split/preview mode rendered by Asciidoctor.js
 * *Ribbon toolbar* -- four tabbed panels (Text, Insert, Advanced, View) with one-click access to every AsciiDoc construct
 * *Block editing* -- click any rendered table, code block, image, diagram, or blockquote to edit it in a focused modal or inline
 * *Markdown conversion* -- convert existing Markdown notes to AsciiDoc with a single command
@@ -243,25 +243,25 @@ The editor renders AsciiDoc constructs inline as you type. Move your cursor to a
 
 === Supported Constructs
 
-*Headings* -- `+= Title+` through `+===== Level 5+`, rendered with decreasing font sizes and heading colors.
+*Headings* -- `+= Title+` through `+====== Level 5+`, rendered with decreasing font sizes, section numbering, TOC entries, and section IDs.
 
 *Author line* -- A line directly after the document title (`+= Title+`) in the format `+Firstname Lastname <email>+` is parsed as the author line. It renders as a byline under the title heading ("Author Name -- email") and automatically sets the `+{author}+`, `+{firstname}+`, `+{lastname}+`, `+{middlename}+`, `+{authorinitials}+`, and `+{email}+` document attributes.
 
 *Text formatting* -- Bold, italic, monospace, strikethrough, superscript, subscript, underline, overline, highlight, and color/size roles all render inline.
 
-*Lists* -- Bullet (`+*+`), numbered (`+.+`), checklists (`+* [x]+`), and definition lists (`+term::+`) with multi-level nesting. Select multiple list items and press Tab/Shift+Tab to indent/dedent them together.
+*Lists* -- Bullet (`+*+`), numbered (`+.+`), checklists (`+* [x]+`), and definition lists (`+term::+`) with multi-level nesting, ordered list styles (`+[lowerroman]+`, `+[upperalpha]+`, `+[lowergreek]+`), `+start+`, `+%reversed+`, interactive checklists, and horizontal description list sizing. Select multiple list items and press Tab/Shift+Tab to indent/dedent them together.
 
-*Code blocks* -- Fenced source blocks with syntax highlighting and a language label. Click to edit in a modal with a language selector.
+*Code blocks* -- Fenced source/listing blocks with syntax highlighting, language labels, `+:source-language:+`, shorthand attrlists such as `+[%linenums,ruby]+`, IDs, roles, `+opts+`, `+nowrap+`, `+start+`, and highlighted-line metadata. Click to edit in a modal with a language selector.
 
-*Tables* -- Full rendered table with header row/column support, column alignment, vertical alignment, striping patterns, frame and grid options. Click to edit with add/remove row/column controls and header toggles. Supports scale and alignment settings.
+*Tables* -- Full rendered table with header row/column support, `+opts+` aliases, table roles, column and cell alignment, row/column spans, nested AsciiDoc cells, literal cells, striping patterns, frame and grid options. Click to edit with add/remove row/column controls and header toggles. Supports scale and alignment settings.
 
-*Images* -- Web URLs and Joplin local resources (`+:/resourceId+`). Supports alt text, title, caption, scale (10-200%), alignment (center/left/right), and caption position (below/left/right). Click to open a full image editor modal.
+*Images* -- Web URLs and Joplin local resources (`+:/resourceId+`). Supports alt text, title, caption, positional or named pixel/percentage width and height, alignment, float, roles, `+imagesdir+`, links, window targets, link options, and caption position. Click to open a full image editor modal.
 
 *Admonitions* -- NOTE, TIP, WARNING, CAUTION, and IMPORTANT blocks with colored labels.
 
 *Blockquotes* -- Rendered with attribution. Click to edit content and author.
 
-*Table of Contents* -- Add `:toc:` to the document header to generate a clickable Table of Contents from section headings. Supports `:toclevels:` (1-5, default 2), `:toc-title:` (custom title), and three placement modes: `auto` (after header), `preamble` (after preamble), and `macro` (at `toc::[]` location). Click any TOC entry to jump to that heading.
+*Table of Contents* -- Add `:toc:` to the document header to generate a clickable Table of Contents from section headings. Supports `:toclevels:` (1-5, default 2), `:toc-title:` (custom title), section numbering, `+idprefix+`, `+idseparator+`, and three placement modes: `auto` (after header), `preamble` (after preamble), and `macro` (at `toc::[]` location). Click any TOC entry to jump to that heading.
 
 *Mermaid diagrams* -- `+[mermaid]+` blocks render 24 diagram types inline: Flowchart, Sequence, Class, State, ER, Gantt, Pie, User Journey, Git Graph, Mindmap, Timeline, Quadrant, Sankey, XY Chart, Block, Packet, Kanban, Architecture, C4 (Context/Container/Component/Deployment), Requirement, and ZenUML. Click to edit in a dedicated modal with live preview. Supports scale, alignment, and theme switching.
 
@@ -271,17 +271,19 @@ The editor renders AsciiDoc constructs inline as you type. Move your cursor to a
 
 *Math / STEM* -- Inline math via `+stem:[]+`, `+latexmath:[]+`, or `+asciimath:[]+` macros renders via KaTeX directly in the preview. Display-mode block math uses `+[latexmath]+` / `+[asciimath]+` / `+[stem]+` attribute followed by `+++++` delimiters. The `:stem:` document attribute controls the default notation. AsciiMath expressions are auto-converted to LaTeX before rendering. Click a rendered block equation to edit in a modal with live preview, notation selector, scale (10-200%), and alignment.
 
-*Element attributes* -- Role/attribute lines like `+[.text-center]+` are hidden in preview but automatically revealed for editing when the affected line is clicked.
+*Element attributes* -- Role/attribute lines like `+[.text-center]+`, `+[role=text-center]+`, `+[#id.role%option]+`, and `+[opts="a,b"]+` are hidden in preview but automatically revealed for editing when the affected line is clicked.
 
-*Collapsible blocks* -- `+[%collapsible]+` blocks render with a clickable caret to expand/collapse.
+*Collapsible blocks* -- `+[%collapsible]+`, `+[%collapsible%open]+`, and paragraph-form `+[example%collapsible]+` blocks render with a clickable caret to expand/collapse.
 
 *Sidebar & Example blocks* -- Rendered with appropriate borders and backgrounds.
 
-*Horizontal rules & page breaks* -- `+'''+` renders as a divider; `+<<<+` renders as a labeled page break.
+*Horizontal rules & page breaks* -- `+'''+`, Markdown-style thematic breaks, and `+<<<+` render as dividers or labeled page/column breaks, including roles and options such as `+[.column%always]+`.
 
 *AsciiDoc text replacements* -- `+(C)+` becomes (C), `+->+` becomes ->, `+--+` becomes an em dash, `+...+` becomes an ellipsis, and more.
 
-*Attribute references* -- `+{name}+` references are resolved against both built-in AsciiDoc attributes and document-defined attributes (from the header and author line).
+*Attribute references* -- `+{name}+` references are resolved against built-in AsciiDoc attributes, author-line attributes, document header attributes, body attributes, and unset attribute entries such as `+:!name:+`.
+
+For canonical Asciidoctor output, use the split/preview modes. Those render through Asciidoctor.js in the plugin sandbox; Live Preview is an inline editor approximation designed for low-latency editing.
 
 '''
 

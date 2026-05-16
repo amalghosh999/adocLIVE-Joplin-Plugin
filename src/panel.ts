@@ -161,7 +161,8 @@ function attributeCompletionSource(context: CompletionContext): CompletionResult
   const match = context.matchBefore(/\{[\w-]*/);
   if (!match) return null;
 
-  const docAttrs = getDocumentAttributes();
+  const lineNumber = context.state.doc.lineAt(match.from).number;
+  const docAttrs = getDocumentAttributes(lineNumber);
   if (docAttrs.size === 0) return null;
 
   const query = match.text.slice(1).toLowerCase(); // strip leading {

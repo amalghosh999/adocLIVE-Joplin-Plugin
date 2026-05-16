@@ -7,6 +7,7 @@ import {
   findSectionLineNumber,
   generateSectionAnchor,
 } from "../../src/shared/asciidoc-sections";
+import { collectAsciiDocAttributeTimeline } from "../../src/shared/asciidoc-attributes";
 
 describe("generateSectionAnchor", () => {
   it("normalizes section titles into AsciiDoc-style anchors", () => {
@@ -267,6 +268,10 @@ describe("generateSectionAnchor — idprefix/idseparator", () => {
   it("combines custom prefix and separator", () => {
     expect(generateSectionAnchor("My Section", { idprefix: "sec-", idseparator: "-" })).toBe("sec-my-section");
   });
+
+  it("uses an empty idseparator when opts.idseparator is empty string", () => {
+    expect(generateSectionAnchor("Hello World", { idseparator: "" })).toBe("_helloworld");
+  });
 });
 
 describe("collectDocumentSections — opts forwarded", () => {
@@ -275,6 +280,42 @@ describe("collectDocumentSections — opts forwarded", () => {
     const sections = collectDocumentSections(content, { idseparator: "-" });
     expect(sections[0].anchor).toBe("_hello-world");
     expect(sections[1].anchor).toBe("_hello-world-2");
+  });
+
+  it("uses line-effective idprefix and idseparator values", () => {
+    const content = [
+      "= Document",
+      ":idprefix: sec-",
+      ":idseparator: -",
+      "",
+      "== Hello World",
+      "",
+      ":idprefix:",
+      ":idseparator:",
+      "== No Separator",
+      "",
+      ":!idprefix:",
+      ":!idseparator:",
+      "== Back To Default",
+    ].join("\n");
+    const timeline = collectAsciiDocAttributeTimeline(content);
+    const sections = collectDocumentSections(content, { attributeTimeline: timeline });
+
+    expect(sections.map((section) => section.anchor)).toEqual([
+      "_document",
+      "sec-hello-world",
+      "noseparator",
+      "_back_to_default",
+    ]);
+  });
+
+  it("collects level-6 headings", () => {
+    const content = "====== Deep Heading";
+    expect(collectDocumentSections(content)[0]).toMatchObject({
+      level: 6,
+      title: "Deep Heading",
+      anchor: "_deep_heading",
+    });
   });
 });
 
@@ -308,5 +349,23 @@ describe("extractDocumentAnchorOptions", () => {
 
     expect(findSectionLineNumber(content, "hello-world")).toBe(5);
     expect(extractSectionContent(content, "hello-world")).toBe("== Hello World\nBody.");
+  });
+
+  it("reads idprefix and idseparator from pre-title document attributes", () => {
+    const content = [
+      ":idprefix:",
+      ":idseparator: -",
+      "",
+      "= Document",
+      "",
+      "== Hello World",
+      "Body.",
+    ].join("\n");
+
+    expect(extractDocumentAnchorOptions(content)).toEqual({
+      idprefix: "",
+      idseparator: "-",
+    });
+    expect(findSectionLineNumber(content, "hello-world")).toBe(6);
   });
 });

@@ -1,3 +1,9 @@
+import {
+  type AsciiDocAttributeTimeline,
+  collectAsciiDocAttributeTimeline,
+  getEffectiveAsciiDocAttributeMapAtLine,
+} from "./asciidoc-attributes";
+
 export interface DocumentSection {
   anchor: string;
   explicitAnchor?: string;
@@ -27,12 +33,18 @@ function stripInlineMarkupForId(title: string): string {
     .replace(/pass:\[[^\]]*\]/g, "");           // pass:[...]
 }
 
-export interface AnchorOptions { idprefix?: string; idseparator?: string; }
-
-const ATTRIBUTE_LINE_REGEX = /^:([^:]+):\s*(.*)$/;
+export interface AnchorOptions {
+  idprefix?: string;
+  idseparator?: string;
+  attributeTimeline?: AsciiDocAttributeTimeline;
+}
 
 export function extractDocumentAnchorOptions(content: string): AnchorOptions {
-  const attributes = extractDocheaderAttributes(content);
+  const timeline = collectAsciiDocAttributeTimeline(content);
+  const attributes = getEffectiveAsciiDocAttributeMapAtLine(
+    timeline,
+    timeline.headerEndLine > 0 ? timeline.headerEndLine + 1 : 1,
+  );
   const opts: AnchorOptions = {};
   if (attributes.has("idprefix")) opts.idprefix = attributes.get("idprefix") ?? "";
   if (attributes.has("idseparator")) opts.idseparator = attributes.get("idseparator") ?? "";
@@ -41,21 +53,27 @@ export function extractDocumentAnchorOptions(content: string): AnchorOptions {
 
 export function generateSectionAnchor(title: string, opts?: AnchorOptions): string {
   const prefix = opts?.idprefix !== undefined ? opts.idprefix : "_";
-  const sep = (opts?.idseparator ?? "_") || "_";
-  const escapedSep = sep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sep = opts?.idseparator !== undefined ? opts.idseparator : "_";
   const plain = stripInlineMarkupForId(title);
-  const normalized = plain
+  let normalized = plain
     .toLowerCase()
-    .replace(/[^a-z0-9\s._-]/g, "")           // keep alpha, digit, space, dot, hyphen, underscore
-    .replace(/[\s._-]+/g, sep)                  // word delimiters (including dots) → separator
-    .replace(new RegExp(`^${escapedSep}+|${escapedSep}+$`, "g"), ""); // trim leading/trailing sep
-  return normalized ? `${prefix}${normalized}` : (prefix || sep);
+    .replace(/[^a-z0-9\s._-]/g, "");           // keep alpha, digit, space, dot, hyphen, underscore
+  if (sep === "") {
+    normalized = normalized.replace(/[\s._-]+/g, "");
+  } else {
+    const escapedSep = sep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    normalized = normalized
+      .replace(/[\s._-]+/g, sep)                  // word delimiters (including dots) → separator
+      .replace(new RegExp(`^${escapedSep}+|${escapedSep}+$`, "g"), ""); // trim leading/trailing sep
+  }
+  return normalized ? `${prefix}${normalized}` : (prefix || sep || "_");
 }
 
 export function collectDocumentSections(content: string, opts?: AnchorOptions): DocumentSection[] {
   const sections: DocumentSection[] = [];
   let pendingExplicitAnchor: { id: string; reftext?: string } | undefined;
   const usedAnchors = new Set<string>();
+  const timeline = opts?.attributeTimeline;
 
   for (const [index, line] of content.split("\n").entries()) {
     const trimmed = line.trim();
@@ -72,7 +90,8 @@ export function collectDocumentSections(content: string, opts?: AnchorOptions): 
     }
 
     const title = headingMatch[2].trim();
-    const generatedAnchor = generateUniqueGeneratedAnchor(title, usedAnchors, opts);
+    const lineOptions = getAnchorOptionsForLine(index + 1, opts, timeline);
+    const generatedAnchor = generateUniqueGeneratedAnchor(title, usedAnchors, lineOptions);
     const anchor = pendingExplicitAnchor?.id || generatedAnchor;
     sections.push({
       anchor,
@@ -89,42 +108,15 @@ export function collectDocumentSections(content: string, opts?: AnchorOptions): 
   return sections;
 }
 
-function extractDocheaderAttributes(content: string): Map<string, string> {
-  const attributes = new Map<string, string>();
-  const lines = content.split("\n");
-  let index = 0;
-
-  while (index < lines.length && !lines[index].trim()) index++;
-
-  const titleLine = lines[index]?.trim() ?? "";
-  const hasTitle = /^=\s+/.test(titleLine);
-  if (hasTitle) index++;
-
-  if (hasTitle && index < lines.length) {
-    const candidate = lines[index].trim();
-    if (candidate && !candidate.startsWith(":") && !candidate.startsWith("[") && !candidate.startsWith("=")) {
-      const authorMatch = candidate.match(/^([^<;]+?)(?:\s+<([^>]+)>)?$/);
-      if (authorMatch) index++;
-    }
-  }
-
-  while (index < lines.length) {
-    const line = lines[index].trim();
-    if (!line) break;
-    const attrMatch = line.match(ATTRIBUTE_LINE_REGEX);
-    if (!attrMatch || line.startsWith("::")) break;
-    attributes.set(attrMatch[1].toLowerCase(), attrMatch[2]);
-    index++;
-  }
-
-  return attributes;
-}
-
 export function findSectionLineNumber(content: string, anchor: string): number | null {
   const targetAnchor = anchor.trim();
   if (!targetAnchor) return null;
 
-  const section = collectDocumentSections(content, extractDocumentAnchorOptions(content))
+  const timeline = collectAsciiDocAttributeTimeline(content);
+  const section = collectDocumentSections(content, {
+    ...extractDocumentAnchorOptions(content),
+    attributeTimeline: timeline,
+  })
     .find((candidate) => candidate.anchor === targetAnchor);
   if (section) return section.lineNumber;
 
@@ -178,7 +170,7 @@ function parseExplicitAnchor(trimmedLine: string): { id: string; reftext?: strin
 }
 
 function generateUniqueGeneratedAnchor(title: string, usedAnchors: Set<string>, opts?: AnchorOptions): string {
-  const sep = (opts?.idseparator ?? "_") || "_";
+  const sep = opts?.idseparator !== undefined ? opts.idseparator : "_";
   const anchor = generateSectionAnchor(title, opts);
   if (!usedAnchors.has(anchor)) return anchor;
 
@@ -194,7 +186,11 @@ export function extractSectionContent(content: string, anchor: string, opts?: An
   if (!targetAnchor) return "";
 
   const lines = content.split("\n");
-  const sections = collectDocumentSections(content, opts ?? extractDocumentAnchorOptions(content));
+  const timeline = opts?.attributeTimeline ?? collectAsciiDocAttributeTimeline(content);
+  const sections = collectDocumentSections(content, {
+    ...(opts ?? extractDocumentAnchorOptions(content)),
+    attributeTimeline: timeline,
+  });
   const sectionIndex = sections.findIndex((candidate) => candidate.anchor === targetAnchor);
   if (sectionIndex === -1) return "";
 
@@ -208,4 +204,18 @@ export function extractSectionContent(content: string, anchor: string, opts?: An
   }
 
   return lines.slice(section.lineNumber - 1, endLineNumber - 1).join("\n").trim();
+}
+
+function getAnchorOptionsForLine(
+  lineNumber: number,
+  opts?: AnchorOptions,
+  timeline?: AsciiDocAttributeTimeline,
+): AnchorOptions | undefined {
+  if (!timeline) return opts;
+
+  const attributes = getEffectiveAsciiDocAttributeMapAtLine(timeline, lineNumber);
+  return {
+    idprefix: attributes.has("idprefix") ? attributes.get("idprefix") ?? "" : undefined,
+    idseparator: attributes.has("idseparator") ? attributes.get("idseparator") ?? "" : undefined,
+  };
 }
