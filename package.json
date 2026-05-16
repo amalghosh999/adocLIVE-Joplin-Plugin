@@ -1,6 +1,6 @@
 {
   "name": "com.asciidoc.joplin-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "adocLIVE AsciiDoc live-preview editor for Joplin",
   "license": "MIT",
   "author": "Amal Ghosh <amalghosh999@gmail.com>",
