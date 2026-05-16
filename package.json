@@ -4,6 +4,10 @@
   "description": "adocLIVE AsciiDoc live-preview editor for Joplin",
   "license": "MIT",
   "author": "Amal Ghosh <amalghosh999@gmail.com>",
+  "contributors": [
+    "Amal Ghosh <amalghosh999@gmail.com>",
+    "Codex <noreply@openai.com>"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/amalghosh999/joplin-asciidoc-plugin.git"
