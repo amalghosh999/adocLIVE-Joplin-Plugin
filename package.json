@@ -1,6 +1,6 @@
 {
   "name": "joplin-plugin-adoclive",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "adocLIVE AsciiDoc live-preview editor for Joplin",
   "license": "MIT",
   "author": "Amal Ghosh <amalghosh999@gmail.com>",
@@ -59,6 +59,7 @@
     "@mermaid-js/layout-elk": "^0.2.1",
     "asciidoctor": "^3.0.4",
     "asciimath2tex": "^1.5.0",
+    "highlight.js": "^11.11.1",
     "katex": "^0.16.39",
     "mermaid": "^11.13.0",
     "nspell": "^2.1.5"

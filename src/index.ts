@@ -13,6 +13,8 @@ import {
   type JoplinNoteLinkCandidate,
 } from "./shared/joplin-note-links";
 import { normalizeNoteIdsFromCommandArgs } from "./shared/joplin-command-args";
+import { highlightRenderedSourceBlocksInHtml } from "./lib/utils/rendered-highlight";
+import { prepareAsciiDocMathForRendering } from "./lib/utils/rendered-math";
 
 // Joplin MenuItemLocation values (defined locally to avoid requiring api/types at runtime)
 const MenuItemLocation = {
@@ -923,12 +925,14 @@ function renderAsciidoc(source: string, settings: Record<string, any> = {}): str
       icons: "font",
       ...(settings.attributes || {}),
     };
-    return asciidoctor.convert(source, {
+    const preparedMath = prepareAsciiDocMathForRendering(source, { attributes });
+    const html = asciidoctor.convert(preparedMath.source, {
       safe: "safe",
       backend: "html5",
       standalone: false,
       attributes,
     });
+    return highlightRenderedSourceBlocksInHtml(preparedMath.renderHtml(String(html)));
   } catch (e: any) {
     return `<div class="render-error"><h3>AsciiDoc Render Error</h3><pre>${
       (e.message || String(e)).replace(/</g, "&lt;").replace(/>/g, "&gt;")

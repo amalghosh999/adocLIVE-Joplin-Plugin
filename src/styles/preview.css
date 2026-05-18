@@ -158,6 +158,74 @@
 	font-size: 0.8125em;
 }
 
+/* Highlight.js tokens for rendered, non-editable preview source blocks */
+#preview-pane pre code.hljs {
+	color: var(--asciidoc-fg, #333);
+}
+
+#preview-pane .hljs-comment,
+#preview-pane .hljs-quote {
+	color: var(--asciidoc-placeholder, #6a737d);
+	font-style: italic;
+}
+
+#preview-pane .hljs-keyword,
+#preview-pane .hljs-selector-tag,
+#preview-pane .hljs-subst {
+	color: #d73a49;
+	font-weight: 600;
+}
+
+#preview-pane .hljs-string,
+#preview-pane .hljs-doctag,
+#preview-pane .hljs-regexp {
+	color: #0b7285;
+}
+
+#preview-pane .hljs-title,
+#preview-pane .hljs-section,
+#preview-pane .hljs-selector-id {
+	color: #6f42c1;
+	font-weight: 600;
+}
+
+#preview-pane .hljs-type,
+#preview-pane .hljs-class .hljs-title,
+#preview-pane .hljs-number,
+#preview-pane .hljs-literal {
+	color: #005cc5;
+}
+
+#preview-pane .hljs-attr,
+#preview-pane .hljs-attribute,
+#preview-pane .hljs-name,
+#preview-pane .hljs-variable,
+#preview-pane .hljs-template-variable {
+	color: #e36209;
+}
+
+#preview-pane .hljs-built_in,
+#preview-pane .hljs-symbol,
+#preview-pane .hljs-bullet,
+#preview-pane .hljs-link {
+	color: #22863a;
+}
+
+#preview-pane .hljs-meta,
+#preview-pane .hljs-selector-class,
+#preview-pane .hljs-selector-attr,
+#preview-pane .hljs-selector-pseudo {
+	color: #735c0f;
+}
+
+#preview-pane .hljs-emphasis {
+	font-style: italic;
+}
+
+#preview-pane .hljs-strong {
+	font-weight: 700;
+}
+
 /* Source/listing blocks */
 #preview-pane .listingblock {
 	margin: 0 0 1.25em;
@@ -277,6 +345,46 @@
 	text-transform: capitalize;
 }
 
+/* Asciidoctor emits Font Awesome class names when icons=font. The plugin does
+   not ship Font Awesome, so provide local glyph fallbacks for every admonition. */
+#preview-pane .admonitionblock td.icon .fa {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.75em;
+	height: 1.75em;
+	border-radius: 999px;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	font-style: normal;
+	font-weight: 800;
+	font-size: 1rem;
+	line-height: 1;
+}
+
+#preview-pane .admonitionblock td.icon .icon-note::before {
+	content: "\24D8";
+}
+
+#preview-pane .admonitionblock td.icon .icon-tip::before {
+	content: "\2726";
+}
+
+#preview-pane .admonitionblock td.icon .icon-warning::before {
+	content: "\26A0";
+}
+
+#preview-pane .admonitionblock td.icon .icon-caution::before {
+	content: "\25B2";
+}
+
+#preview-pane .admonitionblock td.icon .icon-important::before {
+	content: "\0021";
+}
+
+#preview-pane .admonitionblock td.icon .icon-question::before {
+	content: "\003F";
+}
+
 #preview-pane .admonitionblock td.content {
 	padding-left: 1.125em;
 	padding-right: 1.25em;
@@ -295,8 +403,10 @@
 	border-left: 4px solid #5bc0de;
 	background: rgba(91, 192, 222, 0.08);
 }
-#preview-pane .admonitionblock.note td.icon .title {
+#preview-pane .admonitionblock.note td.icon .title,
+#preview-pane .admonitionblock.note td.icon .fa {
 	color: #31708f;
+	background: rgba(91, 192, 222, 0.14);
 }
 
 /* TIP */
@@ -304,8 +414,10 @@
 	border-left: 4px solid #5cb85c;
 	background: rgba(92, 184, 92, 0.08);
 }
-#preview-pane .admonitionblock.tip td.icon .title {
+#preview-pane .admonitionblock.tip td.icon .title,
+#preview-pane .admonitionblock.tip td.icon .fa {
 	color: #3c763d;
+	background: rgba(92, 184, 92, 0.14);
 }
 
 /* WARNING */
@@ -313,8 +425,10 @@
 	border-left: 4px solid #f0ad4e;
 	background: rgba(240, 173, 78, 0.08);
 }
-#preview-pane .admonitionblock.warning td.icon .title {
+#preview-pane .admonitionblock.warning td.icon .title,
+#preview-pane .admonitionblock.warning td.icon .fa {
 	color: #8a6d3b;
+	background: rgba(240, 173, 78, 0.16);
 }
 
 /* CAUTION */
@@ -322,8 +436,10 @@
 	border-left: 4px solid #e67e22;
 	background: rgba(230, 126, 34, 0.08);
 }
-#preview-pane .admonitionblock.caution td.icon .title {
+#preview-pane .admonitionblock.caution td.icon .title,
+#preview-pane .admonitionblock.caution td.icon .fa {
 	color: #a35415;
+	background: rgba(230, 126, 34, 0.15);
 }
 
 /* IMPORTANT */
@@ -331,8 +447,10 @@
 	border-left: 4px solid #d9534f;
 	background: rgba(217, 83, 79, 0.08);
 }
-#preview-pane .admonitionblock.important td.icon .title {
+#preview-pane .admonitionblock.important td.icon .title,
+#preview-pane .admonitionblock.important td.icon .fa {
 	color: #a94442;
+	background: rgba(217, 83, 79, 0.14);
 }
 
 /* QUESTION (custom) */
@@ -340,8 +458,10 @@
 	border-left: 4px solid #f1c40f;
 	background: rgba(241, 196, 15, 0.08);
 }
-#preview-pane .admonitionblock.question td.icon .title {
+#preview-pane .admonitionblock.question td.icon .title,
+#preview-pane .admonitionblock.question td.icon .fa {
 	color: #9a7b0a;
+	background: rgba(241, 196, 15, 0.16);
 }
 
 /* ===== Blockquotes ===== */
@@ -485,6 +605,29 @@
 #preview-pane pre .conum[data-value] {
 	position: relative;
 	top: -0.125em;
+}
+
+/* ===== Math / STEM ===== */
+#preview-pane .cm-rendered-math--inline {
+	display: inline;
+	vertical-align: baseline;
+}
+
+#preview-pane .cm-rendered-math--block {
+	display: block;
+	margin: 0.75em 0;
+	text-align: center;
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
+#preview-pane .stemblock {
+	margin: 0 0 1.25em;
+}
+
+#preview-pane .stemblock > .content {
+	text-align: center;
+	overflow-x: auto;
 }
 
 /* ===== Bibliography ===== */
