@@ -1,6 +1,6 @@
 {
-  "name": "com.asciidoc.joplin-plugin",
-  "version": "1.0.1",
+  "name": "joplin-plugin-adoclive",
+  "version": "1.0.2",
   "description": "adocLIVE AsciiDoc live-preview editor for Joplin",
   "license": "MIT",
   "author": "Amal Ghosh <amalghosh999@gmail.com>",
@@ -10,9 +10,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/amalghosh999/joplin-asciidoc-plugin.git"
+    "url": "git+https://github.com/amalghosh999/adocLIVE-Joplin-Plugin.git"
   },
-  "homepage": "https://github.com/amalghosh999/joplin-asciidoc-plugin",
+  "homepage": "https://github.com/amalghosh999/adocLIVE-Joplin-Plugin",
   "keywords": [
     "joplin-plugin"
   ],
@@ -20,14 +20,15 @@
     "publish"
   ],
   "scripts": {
-    "build": "npm run build:jpl",
+    "build": "npm run dist",
     "build:bundle": "webpack --mode=production",
-    "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('com.asciidoc.joplin-plugin.jpl',{force:true});\"",
-    "build:jpl": "npm run clean && npm run build:bundle && cd dist && tar -czf ../com.asciidoc.joplin-plugin.jpl *",
-    "deploy:joplin": "npm run build:jpl && node scripts/deploy-joplin.js",
+    "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('publish',{recursive:true,force:true}); fs.rmSync('com.asciidoc.joplin-plugin.jpl',{force:true});\"",
+    "dist": "npm run clean && npm run build:bundle && node scripts/create-publish-artifacts.js",
+    "build:jpl": "npm run dist",
+    "deploy:joplin": "npm run dist && node scripts/deploy-joplin.js",
     "typecheck": "tsc --noEmit --pretty false",
     "test:unit": "vitest run",
-    "prepublishOnly": "npm run build:jpl && mkdir -p publish && cp com.asciidoc.joplin-plugin.jpl publish/",
+    "prepublishOnly": "npm run test:unit && npm run typecheck && npm run dist",
     "release": "./scripts/release.sh patch",
     "release:minor": "./scripts/release.sh minor",
     "release:major": "./scripts/release.sh major",

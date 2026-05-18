@@ -427,17 +427,7 @@ function collectRawLineNumbers(state: EditorState, blocks: BlockInfo[]): Set<num
     }
   }
 
-  for (const block of blocks) {
-    if (block.type !== "docheader") continue;
-    if (block.titleLine > 0 && block.authorLine > 0) {
-      if (rawLines.has(block.titleLine)) {
-        rawLines.add(block.authorLine);
-      } else if (rawLines.has(block.authorLine)) {
-        rawLines.add(block.titleLine);
-      }
-    }
-    break;
-  }
+  expandDocumentHeaderRawLineNumbers(rawLines, blocks);
 
   return rawLines;
 }
@@ -447,6 +437,23 @@ function blockTouchesRawSelection(rawLines: Set<number>, blockStart: number, blo
     if (rawLines.has(line)) return true;
   }
   return false;
+}
+
+function expandDocumentHeaderRawLineNumbers(rawLines: Set<number>, blocks: BlockInfo[]): void {
+  const docHeaderBlocks = blocks.filter((block): block is DocHeaderBlockInfo => block.type === "docheader");
+  if (docHeaderBlocks.length === 0) return;
+
+  const titleLine = docHeaderBlocks.find(block => block.titleLine > 0)?.titleLine ?? -1;
+  const headerIsActive = (titleLine > 0 && rawLines.has(titleLine))
+    || docHeaderBlocks.some(block => blockTouchesRawSelection(rawLines, block.startLine, block.endLine));
+  if (!headerIsActive) return;
+
+  if (titleLine > 0) rawLines.add(titleLine);
+  for (const block of docHeaderBlocks) {
+    for (let line = block.startLine; line <= block.endLine; line++) {
+      rawLines.add(line);
+    }
+  }
 }
 
 function getPreviewLineFromElement(element: HTMLElement | null): number | null {
@@ -3016,8 +3023,10 @@ function getBlockStartLineNumber(block: BlockInfo): number {
   if (block.type === "video" && block.titleLine > 0) return block.titleLine;
   if (block.type === "audio" && block.titleLine > 0) return block.titleLine;
   if (block.type === "verse") return block.attrLine;
-  if (block.type === "contentblock" && block.titleLine > 0) return block.titleLine;
-  if (block.type === "contentblock" && block.attrLine > 0) return block.attrLine;
+  if (block.type === "contentblock") {
+    const metadataLines = [block.titleLine, block.attrLine].filter((lineNumber) => lineNumber > 0);
+    if (metadataLines.length > 0) return Math.min(...metadataLines);
+  }
   if (block.type === "bibliography") return block.attrLine;
   if (block.type === "image") return block.imageLine;
   if (block.type === "video") return block.macroLine;
@@ -3504,6 +3513,54 @@ function detectBlocks(doc: any, attributeTimeline?: AsciiDocAttributeTimeline): 
     const blockAttrs = parseContentBlockAttributeLine(text);
     if (blockAttrs && i + 1 <= doc.lines) {
       const nextText = doc.line(i + 1).text.trim();
+
+      const titleAfterAttrsMatch = nextText.match(/^\.(?!\.)(.+)$/);
+      if (titleAfterAttrsMatch && i + 2 <= doc.lines) {
+        const title = titleAfterAttrsMatch[1].trim();
+        const afterTitleText = doc.line(i + 2).text.trim();
+        const delimitedKind = resolveDelimitedContentBlockKind(afterTitleText, blockAttrs);
+        if (delimitedKind) {
+          const delimiterPattern = /^\*{4,}$/.test(afterTitleText) ? /^\*{4,}$/ : /^={4,}$/;
+          const closeLine = findDelimitedBlockCloseLine(doc, i + 3, delimiterPattern);
+          if (closeLine > 0) {
+            blocks.push(createContentBlockInfo({
+              kind: delimitedKind.kind,
+              titleLine: i + 1,
+              attrLine: i,
+              openLine: i + 2,
+              closeLine,
+              delimited: true,
+              title,
+              attrs: blockAttrs,
+              admonitionType: delimitedKind.admonitionType,
+            }));
+            i = closeLine + 1;
+            continue;
+          }
+        }
+
+        if (
+          blockAttrs.style === "example"
+          && blockAttrs.options.includes("collapsible")
+        ) {
+          const closeLine = findParagraphContentEndLine(doc, i + 2);
+          if (closeLine > 0) {
+            blocks.push(createContentBlockInfo({
+              kind: "collapsible",
+              titleLine: i + 1,
+              attrLine: i,
+              openLine: i + 2,
+              closeLine,
+              delimited: false,
+              title,
+              attrs: blockAttrs,
+            }));
+            i = closeLine + 1;
+            continue;
+          }
+        }
+      }
+
       const delimitedKind = resolveDelimitedContentBlockKind(nextText, blockAttrs);
       if (delimitedKind) {
         const delimiterPattern = /^\*{4,}$/.test(nextText) ? /^\*{4,}$/ : /^={4,}$/;
@@ -5324,6 +5381,7 @@ export function __testGetLivePreviewCodeBlocks(source: string): Array<{
 
 export function __testGetLivePreviewContentBlocks(source: string): Array<{
   kind: ContentBlockInfo["kind"];
+  startLine: number;
   titleLine: number;
   attrLine: number;
   openLine: number;
@@ -5342,6 +5400,7 @@ export function __testGetLivePreviewContentBlocks(source: string): Array<{
     .filter((block): block is ContentBlockInfo => block.type === "contentblock")
     .map((block) => ({
       kind: block.kind,
+      startLine: getBlockStartLineNumber(block),
       titleLine: block.titleLine,
       attrLine: block.attrLine,
       openLine: block.openLine,
@@ -5567,6 +5626,23 @@ export function __testGetLivePreviewDocumentTitleRoleStyle(source: string): stri
   return getCombinedRoleStyle(timeline.documentHeader.titleRoles);
 }
 
+export function __testGetLivePreviewRawLines(source: string, cursorLine: number, anchorLine = cursorLine): number[] {
+  const doc = createStringDoc(source);
+  const timeline = collectAsciiDocAttributeTimeline(source);
+  const blocks = detectBlocks(doc, timeline);
+  const state = {
+    doc,
+    selection: {
+      main: {
+        head: doc.line(cursorLine).from,
+        anchor: doc.line(anchorLine).from,
+      },
+    },
+  } as EditorState;
+
+  return [...collectRawLineNumbers(state, blocks)].sort((a, b) => a - b);
+}
+
 export function __testGetLivePreviewRoleAttributeStyle(line: string): string {
   return getCombinedRoleStyle(parseAsciiDocRoleOnlyAttribute(line));
 }
@@ -5586,6 +5662,16 @@ function createStringDoc(source: string): any {
       const text = lines[lineNumber - 1] ?? "";
       const from = starts[lineNumber - 1] ?? 0;
       return { text, from, to: from + text.length };
+    },
+    lineAt(position: number) {
+      let lineNumber = 1;
+      for (let index = 0; index < starts.length; index++) {
+        if (starts[index] <= position) lineNumber = index + 1;
+        else break;
+      }
+      const text = lines[lineNumber - 1] ?? "";
+      const from = starts[lineNumber - 1] ?? 0;
+      return { text, from, to: from + text.length, number: lineNumber };
     },
     toString() {
       return source;
@@ -8459,10 +8545,10 @@ function buildDecorations(
       // own padding separately in their cursorInBlock rendering path.
 
       if (block.type === "docheader") {
-        // Also treat cursor on the title line as "in block" so clicking the
-        // heading reveals the author line and attributes for editing.
-        const titleOnCursor = editorHasFocus && block.titleLine > 0 && cursorLine === block.titleLine;
-        if (!cursorInBlock && !titleOnCursor) {
+        // Keep the whole document-header metadata group raw while the cursor
+        // is on the document title or any header control line.
+        const docHeaderRawActive = editorHasFocus && blockTouchesRawSelection(rawLines, blockStart, blockEnd);
+        if (!docHeaderRawActive) {
           const showDocHeaderWidget = docAttributesVisible && block.showWidget;
           if (showDocHeaderWidget) {
             // Show the Document Attributes widget

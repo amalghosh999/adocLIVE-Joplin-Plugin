@@ -16,6 +16,7 @@ import {
   __testGetLivePreviewTocEntries,
   __testGetLivePreviewTocTargetLine,
   __testGetLivePreviewDocumentTitleRoleStyle,
+  __testGetLivePreviewRawLines,
   __testGetLivePreviewRoleAttributeStyle,
   __testIsLivePreviewAttributeEntryLine,
   __testParseLivePreviewTableAttributes,
@@ -398,6 +399,24 @@ describe("Live Preview document header control blocks", () => {
     ]);
   });
 
+  it("keeps every document-header control line raw while the title or a header control line is active", () => {
+    const source = [
+      ":toc:",
+      ":sectnums:",
+      "",
+      "= Document",
+      "Jane Writer <jane@example.com>",
+      ":toclevels: 5",
+      "",
+      "== Section",
+    ].join("\n");
+
+    expect(__testGetLivePreviewRawLines(source, 4)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(__testGetLivePreviewRawLines(source, 2)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(__testGetLivePreviewRawLines(source, 6)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(__testGetLivePreviewRawLines(source, 8)).toEqual([8]);
+  });
+
   it("does not treat a top source block as document-header control lines", () => {
     const source = [
       "[source]",
@@ -693,6 +712,48 @@ describe("Live Preview content block attrlists", () => {
         closeLine: 24,
         id: "example-id",
         roles: ["featured"],
+      },
+    ]);
+  });
+
+  it("accepts block attribute lines before content block titles", () => {
+    const source = [
+      "[#release-notes%collapsible%open]",
+      ".Release notes",
+      "====",
+      "Body",
+      "====",
+      "",
+      "[example%collapsible]",
+      ".Inline details",
+      "Paragraph body",
+    ].join("\n");
+
+    expect(__testGetLivePreviewContentBlocks(source)).toMatchObject([
+      {
+        kind: "collapsible",
+        startLine: 1,
+        titleLine: 2,
+        attrLine: 1,
+        openLine: 3,
+        closeLine: 5,
+        delimited: true,
+        title: "Release notes",
+        id: "release-notes",
+        options: ["collapsible", "open"],
+        initiallyOpen: true,
+      },
+      {
+        kind: "collapsible",
+        startLine: 7,
+        titleLine: 8,
+        attrLine: 7,
+        openLine: 9,
+        closeLine: 9,
+        delimited: false,
+        title: "Inline details",
+        options: ["collapsible"],
+        initiallyOpen: false,
       },
     ]);
   });

@@ -17,10 +17,10 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
-# Ensure we're on main
+# Ensure we're on master
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if [[ "$BRANCH" != "main" ]]; then
-  echo "Error: Must be on the main branch (currently on '$BRANCH')."
+if [[ "$BRANCH" != "master" ]]; then
+  echo "Error: Must be on the master branch (currently on '$BRANCH')."
   exit 1
 fi
 
@@ -43,27 +43,29 @@ fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n');
 "
 echo "Updated src/manifest.json"
 
-# Build the plugin
-echo "Building plugin..."
-npm run build
+# Validate and build the plugin before tagging/pushing
+echo "Running unit tests..."
+npm run test:unit
 
-# Prepare publish directory
-mkdir -p publish
-cp com.asciidoc.joplin-plugin.jpl publish/
+echo "Running typecheck..."
+npm run typecheck
+
+echo "Building plugin..."
+npm run dist
 
 # Stage, commit, tag
-git add package.json package-lock.json src/manifest.json
+git add package.json package-lock.json src/manifest.json scripts/create-publish-artifacts.js scripts/deploy-joplin.js scripts/release.sh
 git commit -m "Release v$NEW_VERSION"
 git tag "v$NEW_VERSION"
 
 # Push commit and tag
 echo "Pushing to origin..."
-git push origin main
+git push origin master
 git push origin "v$NEW_VERSION"
 
 # Create GitHub release with .jpl asset
 echo "Creating GitHub release..."
-gh release create "v$NEW_VERSION" ./com.asciidoc.joplin-plugin.jpl \
+gh release create "v$NEW_VERSION" ./publish/com.asciidoc.joplin-plugin.jpl \
   --title "v$NEW_VERSION" \
   --notes "Release v$NEW_VERSION" \
   --latest
@@ -75,6 +77,6 @@ npm publish
 echo ""
 echo "Done! Released v$NEW_VERSION"
 echo "  - Git tag: v$NEW_VERSION"
-echo "  - GitHub release: https://github.com/amalghosh999/joplin-asciidoc-plugin/releases/tag/v$NEW_VERSION"
-echo "  - npm: https://www.npmjs.com/package/com.asciidoc.joplin-plugin"
+echo "  - GitHub release: https://github.com/amalghosh999/adocLIVE-Joplin-Plugin/releases/tag/v$NEW_VERSION"
+echo "  - npm: https://www.npmjs.com/package/joplin-plugin-adoclive"
 echo "  - Joplin plugin directory will pick it up within ~30 minutes"

@@ -3,8 +3,8 @@ const os = require("os");
 const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
-const artifact = path.join(repoRoot, "com.asciidoc.joplin-plugin.jpl");
 const pluginId = "com.asciidoc.joplin-plugin";
+const artifact = path.join(repoRoot, "publish", `${pluginId}.jpl`);
 const profiles = [
   path.join(os.homedir(), ".config", "joplindev-desktop"),
   path.join(os.homedir(), ".config", "joplin-desktop"),
