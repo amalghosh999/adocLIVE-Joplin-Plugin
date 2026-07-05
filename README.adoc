@@ -1,24 +1,28 @@
 = adocLIVE -- Live Preview AsciiDoc Editor for Joplin
 
-A full-featured AsciiDoc editor plugin for https://joplinapp.org/[Joplin] with real-time live preview, a ribbon-style toolbar, and rich block editing. Write AsciiDoc notes with the same visual feedback you'd expect from a modern word processor -- rendered headings, images, tables, code blocks, diagrams, and more appear inline as you type.
+A full-featured AsciiDoc editor plugin for https://joplinapp.org/[Joplin] with real-time live preview, rendered preview modes, a ribbon-style toolbar, and rich block editing. Write AsciiDoc notes with the same visual feedback you'd expect from a modern word processor -- rendered headings, media, tables, code blocks, diagrams, math, and more appear inline as you type.
 
-Requires *Joplin 3.1+* (desktop only).
+Requires *Joplin 3.1+* (desktop only). The plugin ID is `com.asciidoc.joplin-plugin`; the npm package is `joplin-plugin-adoclive`.
 
 == Features at a Glance
 
-* *Live preview* -- AsciiDoc renders inline as you type, powered by CodeMirror 6, with split/preview mode rendered by Asciidoctor.js
-* *Ribbon toolbar* -- four tabbed panels (Text, Insert, Advanced, View) with one-click access to every AsciiDoc construct
-* *Block editing* -- click any rendered table, code block, image, diagram, or blockquote to edit it in a focused modal or inline
+* *Live preview* -- AsciiDoc renders inline as you type, powered by CodeMirror 6, with split/raw/rendered preview modes rendered through Asciidoctor.js
+* *Ribbon toolbar* -- four tabbed panels (Text, Insert, Advanced, View) with one-click access to common AsciiDoc structures, formatting, media, references, and editor controls
+* *Block editing* -- click rendered tables, code blocks, images, audio/video blocks, diagrams, blockquotes, and other supported blocks to edit them in focused overlays or inline
 * *Markdown conversion* -- convert existing Markdown notes to AsciiDoc with a single command
 * *Wiki-links & cross-references* -- `+<<noteId,Display Text>>+` links to other notes in the current Joplin notebook with autocomplete
+* *Joplin include support* -- `+include::joplin:<note-id>[]+` and `+include::resource:<resource-id>[]+` directives expand in rendered preview with target autocomplete
 * *Author line* -- author name and email rendered as a byline under the document title, with implicit attribute generation
 * *Attribute autocomplete* -- type `+{+` to autocomplete document attributes defined in the header
 * *Template system* -- save and reuse note templates, plus persistent snippet templates with `@@` inline autocomplete
 * *Spellcheck* -- nspell-based spell checker with personal dictionary support and a Joplin/Electron native fallback
 * *Mermaid diagrams* -- 24 diagram types rendered inline with live preview editing
+* *Math rendering* -- inline and block `+stem:+`, `+latexmath:+`, and `+asciimath:+` content rendered with KaTeX
+* *Media handling* -- insert, paste, or drop images, audio, and video; local files are attached as Joplin resources
 * *Table of Contents* -- automatic TOC generation from document headings
-* *Bibliography* -- citation management with 7 format presets (APA, MLA, Chicago, IEEE, Vancouver, Harvard)
-* *Snippet Templates* -- save named text snippets with Cmd+Shift+C, insert with Cmd+Shift+V or by typing `@@`
+* *Bibliography* -- citation management with 10 format presets (APA, MLA, AMA, Chicago, Turabian, IEEE, Vancouver/NLM, Harvard, ASA)
+* *Snippet Templates* -- save named text snippets with Cmd/Ctrl+Shift+C, insert with Cmd/Ctrl+Shift+V or by typing `@@`
+* *Find & replace* -- custom editor search with match counts, replace, regex, case/word toggles, and find-in-selection
 * *Text case transforms* -- cycle through UPPER, Title Case, lower, snake_case
 * *Smart quotes* -- automatic curly quote insertion with prime/double-prime support
 * *Editor themes* -- follow Joplin's theme or choose Light, Dark, Sepia, High Contrast, or Midnight
@@ -29,14 +33,14 @@ Requires *Joplin 3.1+* (desktop only).
 
 === Installation
 
-. Build the plugin:
+. Install dependencies and build the plugin:
 +
 [source,bash]
 ----
 npm install
 npm run build
 ----
-. Install the generated `com.asciidoc.joplin-plugin.jpl` file in Joplin, or run `npm run deploy:joplin` to copy it into the local Joplin desktop plugin folders and clear the plugin cache.
+. Install the generated `publish/com.asciidoc.joplin-plugin.jpl` file in Joplin, or run `npm run deploy:joplin` to build it, copy it into existing local Joplin desktop profile plugin folders (`~/.config/joplindev-desktop` and/or `~/.config/joplin-desktop`), and clear the plugin cache.
 . *Restart Joplin* (Cmd+Q / Ctrl+Q, then reopen) -- plugins only load on startup.
 
 === Creating an adocLIVE Note
@@ -48,14 +52,15 @@ You can also convert existing notes or create adocLIVE notes on demand:
 * *Tools > New adocLIVE Note* -- creates a blank adocLIVE note
 * *Tools > Convert to adocLIVE Note* -- converts the current Markdown note in place
 * *Tools > Convert to adocLIVE Note (new note)* -- creates an adocLIVE copy, keeping the original
+* *Tools > Edit AsciiDoc Attributes* -- edits plugin-managed Asciidoctor attributes stored in the note's adocLIVE settings block
 * *Right-click a note > Create adocLIVE Copy* -- convert or copy from the note list; multi-note selections are supported
 * *Right-click a note > Replace with adocLIVE Note* -- convert in place from the note list; multi-note selections are supported
 * *Note toolbar button: "Make adocLIVE"* -- one-click convert for the current note
 
 === Converting Entire Notebooks
 
-* *Right-click a notebook > Create adocLIVE Copy of Notebook* -- recursively convert all notes in the notebook to adocLIVE copies
-* *Right-click a notebook > Replace with adocLIVE Notebook* -- recursively convert all notes in the notebook in place
+* *Right-click a notebook > Create adocLIVE Copy of Notebook* -- recursively copy the notebook tree to a new notebook named `+<original notebook> (adocLIVE)+`, converting non-adocLIVE notes along the way
+* *Right-click a notebook > Replace with adocLIVE Notebook* -- recursively convert non-adocLIVE notes in the notebook tree in place
 
 '''
 
@@ -146,19 +151,25 @@ The ribbon toolbar is organized into four tabs:
 | Thematic break (`+'''+`)
 
 | Image
-| Web URL or local file (opens file picker) with scale, alignment, title, and caption options
+| Web URL or local file attachment with scale, alignment, title, caption, and caption-position options
+
+| Video
+| Local video attachment, direct remote URL, YouTube, or Vimeo; supports caption, width/height, start/end offsets, and playback options
+
+| Audio
+| Local audio attachment or remote URL; supports caption, start/end offsets, autoplay, loop, and no-controls options
 
 | Link
-| External URL or wiki-link to another note
+| External URL or cross-reference target
 
 | *Templates section*
-|
+| Template and snippet insertion/management
 
 | Template
 | Insert from your template library (with search/filter and delete), browse and insert snippet templates, manage snippets
 
 | *Symbols section*
-|
+| Searchable symbol browser
 
 | Symbols
 | 11 categories: AsciiDoc, Whitespace, Punctuation, Math, Arrows, Currency, Marks, Shapes, Greek, Super/Sub, Musical
@@ -198,7 +209,7 @@ The ribbon toolbar is organized into four tabs:
 | Inline anchor (`+[[id]]+`)
 
 | Bibliography
-| Insert bibliography section with entries using citation format presets (APA 7th, MLA 9th, Chicago Notes-Bibliography, Chicago Author-Date, IEEE, Vancouver/NLM, Harvard)
+| Insert or open a bibliography section and add entries using citation presets: APA 7, MLA 9, AMA 11, Chicago Notes-Bibliography, Chicago Author-Date, Turabian, IEEE, Vancouver/NLM, Harvard, and ASA 6
 
 | Cite
 | Insert citation reference (`+<<ref>>+`) with dropdown showing bibliography entries
@@ -210,6 +221,9 @@ The ribbon toolbar is organized into four tabs:
 |===
 | Control | Action
 
+| Mode
+| Switch between Live Preview, Split View, Raw Text Only, and Rendered AsciiDoc Preview. Split/preview modes use Asciidoctor.js output.
+
 | Line Numbers
 | Toggle line numbers on/off
 
@@ -220,7 +234,7 @@ The ribbon toolbar is organized into four tabs:
 | Toggle hover-reveal shading on rendered blocks
 
 | Overlay Block Editing
-| Toggle modal editing when clicking rendered blocks
+| Toggle modal editing when clicking rendered blocks in Live Preview (disabled in split/raw/preview modes)
 
 | Fullscreen Mode
 | Toggle fullscreen editing mode
@@ -257,6 +271,8 @@ The editor renders AsciiDoc constructs inline as you type. Move your cursor to a
 
 *Images* -- Web URLs and Joplin local resources (`+:/resourceId+`). Supports alt text, title, caption, positional or named pixel/percentage width and height, alignment, float, roles, `+imagesdir+`, links, window targets, link options, and caption position. Click to open a full image editor modal.
 
+*Audio and video* -- `+audio::+` and `+video::+` block macros render as editable media blocks. Local files inserted from the toolbar, clipboard, or drag-and-drop are attached as Joplin resources. Video supports local files, direct remote URLs, YouTube, and Vimeo; audio supports local files and direct remote URLs.
+
 *Admonitions* -- NOTE, TIP, WARNING, CAUTION, and IMPORTANT blocks with colored labels.
 
 *Blockquotes* -- Rendered with attribution. Click to edit content and author.
@@ -267,7 +283,7 @@ The editor renders AsciiDoc constructs inline as you type. Move your cursor to a
 
 *Footnotes* -- Auto-numbered superscript references [1], [2], [3]. Named footnotes (`+footnote:id[text]+`) share numbers when referenced. Click to see a floating popup with the footnote text.
 
-*Cross-references* -- `+<<noteId,Display Text>>+` renders as a clickable link. Xrefs with section anchors (`+<<noteId#section,text>>+`) include a toggle to preview the linked section inline.
+*Cross-references* -- `+<<noteId,Display Text>>+` and `+xref:target[text]+` render as clickable links. Joplin note references can use note IDs or exact note titles in the active notebook. Xrefs with section anchors (`+<<noteId#section,text>>+`) include a toggle to preview the linked section inline.
 
 *Math / STEM* -- Inline math via `+stem:[]+`, `+latexmath:[]+`, or `+asciimath:[]+` macros renders via KaTeX directly in the preview. Display-mode block math uses `+[latexmath]+` / `+[asciimath]+` / `+[stem]+` attribute followed by `+++++` delimiters. The `:stem:` document attribute controls the default notation. AsciiMath expressions are auto-converted to LaTeX before rendering. Click a rendered block equation to edit in a modal with live preview, notation selector, scale (10-200%), and alignment.
 
@@ -283,6 +299,8 @@ The editor renders AsciiDoc constructs inline as you type. Move your cursor to a
 
 *Attribute references* -- `+{name}+` references are resolved against built-in AsciiDoc attributes, author-line attributes, document header attributes, body attributes, and unset attribute entries such as `+:!name:+`.
 
+*Include directives* -- `+include::...[]+` lines remain visible in inline Live Preview for editing. In Split View and Rendered AsciiDoc Preview, adocLIVE expands supported Joplin note/resource includes before handing the document to Asciidoctor.js.
+
 For canonical Asciidoctor output, use the split/preview modes. Those render through Asciidoctor.js in the plugin sandbox; Live Preview is an inline editor approximation designed for low-latency editing.
 
 '''
@@ -293,17 +311,26 @@ For canonical Asciidoctor output, use the split/preview modes. Those render thro
 |===
 | Shortcut | Action
 
-| Cmd+B | Bold
-| Cmd+I | Italic
-| Cmd+U | Underline
-| Cmd+` | Monospace
-| Cmd+Shift+X | Strikethrough
-| Cmd+. | Superscript
-| Cmd+, | Subscript
-| Cmd+/ | Toggle line comment
-| Cmd+S | Save note
-| Cmd+Shift+C | Save selection as a named snippet template
-| Cmd+Shift+V | Insert a snippet template from the autocomplete list
+| Cmd/Ctrl+B | Bold
+| Cmd/Ctrl+I | Italic
+| Cmd/Ctrl+U | Underline
+| Cmd/Ctrl+` | Monospace
+| Cmd/Ctrl+Shift+X | Strikethrough
+| Cmd/Ctrl+. | Superscript
+| Cmd/Ctrl+, | Subscript
+| Cmd/Ctrl+/ | Toggle line comment
+| Cmd/Ctrl+S | Save note
+| Cmd/Ctrl+F | Open Find
+| Cmd/Ctrl+Shift+F | Open Find & Replace
+| Cmd/Ctrl+H | Open Find & Replace
+| Cmd/Ctrl+Shift+C | Save selection as a named snippet template
+| Cmd/Ctrl+Shift+V | Insert a snippet template from the autocomplete list
+| Cmd/Ctrl+Shift+A | Move to start of current line
+| Cmd/Ctrl+Shift+E | Move to end of current line
+| Cmd/Ctrl+Shift+K | Delete to end of current line
+| Cmd/Ctrl+Shift+D | Delete the character after the cursor
+| Cmd/Ctrl+Shift+T | Transpose characters around the cursor
+| Cmd/Ctrl+Shift+O | Open a new line below the cursor
 | Tab | Indent list item (works on multi-line selections)
 | Shift+Tab | Dedent list item (works on multi-line selections)
 | Enter | Auto-continue list / checklist
@@ -311,7 +338,7 @@ For canonical Asciidoctor output, use the split/preview modes. Those render thro
 | Alt+Delete | Delete word forward
 |===
 
-NOTE: Cmd+F is intercepted by Joplin at the app level. Use the magnifying glass button in the Text tab to open Find & Replace.
+The Find panel also supports match case, whole word, regular expression, find-in-selection, previous/next navigation, replace, replace all, and a live match counter.
 
 '''
 
@@ -351,7 +378,7 @@ NOTE: Cmd+F is intercepted by Joplin at the app level. Use the magnifying glass 
 
 === Spellcheck Context Menu
 
-When right-clicking a misspelled word, additional options appear:
+When the nspell checker is enabled, right-clicking a misspelled word shows spelling actions. When nspell is disabled, the editor uses the Joplin/Electron native spell-check behavior instead.
 
 [cols="1,3"]
 |===
@@ -390,6 +417,42 @@ Type `+@@+` to trigger snippet template autocomplete -- all saved snippets appea
 
 '''
 
+== Joplin Includes
+
+adocLIVE can expand Joplin-backed `+include::+` directives in Split View, Rendered AsciiDoc Preview, and rich-text clipboard rendering. Type `+include::+` to autocomplete supported include targets.
+
+[cols="1,3"]
+|===
+| Include target | Behavior
+
+| `+include::joplin:<note-id>[]+`
+| Includes another adocLIVE note by Joplin note ID
+
+| `+include::<note-id>[]+`
+| Includes another adocLIVE note by bare note ID
+
+| `+include::<exact note title>[]+`
+| Includes an adocLIVE note by exact title match
+
+| `+include::resource:<resource-id>[]+`
+| Includes a text-like Joplin resource attachment. AsciiDoc resource files are stripped of their adocLIVE settings block before expansion.
+
+| `+include:::/<resource-id>[]+` or `+include:::<resource-id>[]+`
+| Includes a text-like Joplin resource using the Joplin resource-reference form
+|===
+
+Supported include attributes:
+
+* `+lines=1..10;15+` -- include selected lines; `+-1+` means the last line
+* `+tag=name+` or `+tags=name;other+` -- include tagged regions; `+tags=**+` removes tag directive lines
+* `+leveloffset=+1+`, `+leveloffset=-1+`, or an absolute numeric level offset -- adjusts included headings
+* `+indent=2+` -- normalizes the included block and re-indents it
+* `+opts=optional+` -- suppresses the missing-include warning block
+
+Missing non-optional includes render as WARNING blocks. Cyclic note/resource includes are detected and skipped with a warning.
+
+'''
+
 == Templates & Snippets
 
 === Note Templates
@@ -422,12 +485,14 @@ When converting a Markdown note to AsciiDoc, the plugin automatically converts:
 * *Links*: `+[text](url)+` becomes `+link:url[text]+`
 * *Images*: `+![alt](url)+` becomes `+image::url[alt]+` (block) or `+image:url[alt]+` (inline)
 * *Linked images*: `+[![alt](img)](link)+` becomes `+image::img[alt, link=link]+`
-* *Inline formatting*: `+**bold**+` becomes `+*bold*+`, `+***bold italic***+` becomes `+*_text_*+`, `+~~strike~~+` becomes `+[.line-through]#text#+`
+* *Inline formatting*: `+**bold**+` becomes `+*bold*+`, `+***bold italic***+` becomes `+*_bold italic_*+`, `+~~strike~~+` becomes `+[.line-through]#text#+`
 * *Code blocks*: Fenced code blocks (`++```lang++`) become AsciiDoc listing blocks (`+[source,lang]+` / `+----+`)
 * *Horizontal rules*: `+---+`, `+***+`, `+___+` become `+'''+`
 * *HTML cleanup*: `+<br>+` tags become newlines, common inline HTML tags are stripped
 * *Escape removal*: Markdown backslash escapes (`+\*+`, `+\[+`, etc.) are cleaned up
 * Content inside fenced code blocks is left untouched
+
+The same converter is used by *Convert from Markdown & Paste* in the editor context menu.
 
 '''
 
@@ -443,7 +508,7 @@ In *Preferences > adocLIVE*:
 
 | Create new notes as adocLIVE
 | Off
-| Automatically convert newly created notes to adocLIVE notes
+| Automatically convert newly created empty/default notes to adocLIVE notes
 
 | Compact Spacing
 | Off
@@ -453,10 +518,33 @@ In *Preferences > adocLIVE*:
 | Off
 | Type `+{+` to show document attribute suggestions
 
+| Editor Theme
+| Follow Joplin theme
+| Choose Follow Joplin theme, Light, Dark, Sepia, High Contrast, or Midnight
+
+| Mermaid Theme Variables
+| `+{}+`
+| JSON object merged into Mermaid `+themeVariables+` for diagram rendering
+|===
+
+=== Spell Checker Settings
+
+In *Preferences > Spell Checker*:
+
+[cols="1,1,3"]
+|===
+| Setting | Default | Description
+
 | Use nspell Spell Checker
 | On
 | Use adocLIVE's nspell checker with dictionary actions; when disabled, the editor falls back to Joplin/Electron native spell checking
+
+| Adding New Words Adds Their Plural/Singular
+| On
+| Adds right-click menu actions for storing a word together with its plural or singular form
 |===
+
+The personal dictionary and snippet templates are stored as private plugin settings and are managed from the editor UI.
 
 === View Settings
 
@@ -465,6 +553,10 @@ View-level settings (in the View toolbar tab), persisted in the browser's localS
 [cols="1,1,3"]
 |===
 | Setting | Default | Description
+
+| Mode
+| Live Preview
+| Persisted editor mode: Live Preview, Split View, Raw Text Only, or Rendered AsciiDoc Preview
 
 | Line Numbers
 | Off
@@ -480,7 +572,7 @@ View-level settings (in the View toolbar tab), persisted in the browser's localS
 
 | Overlay Block Editing
 | On
-| Open a modal when clicking rendered blocks instead of inline editing
+| Open a modal when clicking rendered blocks instead of inline editing; disabled while split/raw/preview modes are active
 
 | Fullscreen Mode
 | Off
@@ -505,7 +597,7 @@ Smart quotes can be toggled via the *Quotes* button in the Advanced toolbar tab 
 
 == Document Attributes & Author Line
 
-Document attributes are key-value pairs defined in the document header (lines starting with `+:name: value+` after the title). They can be referenced anywhere in the document as `+{name}+`.
+Document attributes are key-value pairs defined in the document header (lines starting with `+:name: value+`). adocLIVE recognizes header attributes before the document title, directly after the title/author line, and body attributes that take effect from their source line forward. They can be referenced as `+{name}+`.
 
 An *author line* placed directly after the document title is automatically parsed:
 
@@ -520,30 +612,115 @@ This sets the implicit attributes `+{author}+`, `+{firstname}+`, `+{middlename}+
 
 The *Document Attributes* toggle in the View toolbar tab controls whether the attributes block is visible in the rendered preview.
 
+The *Tools > Edit AsciiDoc Attributes* command edits plugin-managed Asciidoctor attributes stored in the hidden adocLIVE settings block at the end of the note. These attributes are passed to Asciidoctor.js when rendering split/preview output; they do not replace the visible `+:name: value+` lines in the note body.
+
 '''
 
 == Architecture
 
-The plugin consists of two webpack bundles:
+The plugin consists of two webpack bundles copied into `dist/`, then packaged into `publish/com.asciidoc.joplin-plugin.jpl`:
 
-[cols="1,1,1,3"]
+[cols="1,1,3"]
 |===
-| Bundle | Target | Size | Contains
+| Bundle | Target | Contains
 
 | `index.js`
 | Node (plugin sandbox)
-| ~822 KB
-| Plugin registration, commands, settings, IPC handlers, Markdown-to-AsciiDoc converter, Asciidoctor.js rendering
+| Plugin registration, commands, settings, IPC handlers, Markdown-to-AsciiDoc conversion, Joplin include expansion, resource handling, Asciidoctor.js rendering
 
 | `panel.js`
 | Web (webview)
-| ~5.4 MB
-| CodeMirror 6 editor, live-preview decoration engine, KaTeX math rendering, Mermaid diagram rendering (with ELK layout), nspell spellcheck with native fallback, toolbar, IPC client
+| CodeMirror 6 editor, live-preview decoration engine, split/raw/rendered view state, KaTeX math rendering, Mermaid diagram rendering with ELK layout, media editors, nspell spellcheck with native fallback, ribbon toolbar, IPC client
 |===
 
-AsciiDoc notes are identified by a `++```asciidoc-settings++` sentinel block appended to the note body. This block stores document attributes as JSON and is stripped before rendering.
+AsciiDoc notes are identified by a `++```asciidoc-settings++` sentinel block appended to the note body. This block stores plugin-managed JSON settings such as dialog-managed Asciidoctor attributes and is stripped before editing and rendering.
 
-Communication between the plugin sandbox and the webview editor uses Joplin's `postMessage` IPC protocol for operations like saving, rendering, resource resolution, note search, template management, snippet CRUD, spellcheck settings, and fullscreen mode.
+Communication between the plugin sandbox and the webview editor uses Joplin's `postMessage` IPC protocol for operations like saving, rendering, resource creation/resolution, note search, include target lookup, section lookup, template management, snippet CRUD, spellcheck settings, and fullscreen mode.
+
+'''
+
+== Project Structure
+
+The repository is organized around two runtime entry points: `+src/index.ts+` for the Joplin plugin sandbox and `+src/panel.ts+` for the editor webview. The `+src/lib+` and `+src/shared+` folders contain the editor implementation and reusable parsing logic used by both runtime sides.
+
+[source,text]
+----
+joplin-asciidoc-plugin/
+├── README.adoc
+├── package.json
+├── package-lock.json
+├── webpack.config.js
+├── tsconfig.json
+├── src/
+│   ├── manifest.json              # Joplin plugin manifest copied into dist/
+│   ├── index.ts                   # Joplin sandbox entry: commands, settings, rendering, IPC handlers
+│   ├── panel.ts                   # Webview entry: CodeMirror editor, ribbon, search, save, media paste/drop
+│   ├── api-shim.js                # Build-time shim for Joplin's injected API object
+│   ├── api.d.ts                   # Local Joplin API typings
+│   ├── dictionaries/
+│   │   ├── dictionary.d.ts
+│   │   └── en/
+│   │       ├── index.aff          # nspell English dictionary affix data
+│   │       └── index.dic          # nspell English dictionary word data
+│   ├── lib/
+│   │   ├── editor/
+│   │   │   ├── live-preview.ts    # Inline preview decorations and rich block editors
+│   │   │   ├── keybindings.ts     # CodeMirror editor shortcuts
+│   │   │   ├── asciidoc-language.ts
+│   │   │   ├── wiki-link-completion.ts
+│   │   │   ├── include-completion.ts
+│   │   │   ├── spellcheck.ts
+│   │   │   └── bibliography-presets.ts
+│   │   ├── toolbar/
+│   │   │   ├── ribbon.ts          # Ribbon tab shell
+│   │   │   ├── toolbar-actions.ts # Shared toolbar insert/format actions and data
+│   │   │   └── panels/
+│   │   │       ├── text-panel.ts
+│   │   │       ├── insert-panel.ts
+│   │   │       ├── formatting-panel.ts
+│   │   │       └── editor-panel.ts
+│   │   ├── utils/
+│   │   │   ├── image-macro.ts
+│   │   │   ├── video-macro.ts
+│   │   │   ├── audio-macro.ts
+│   │   │   ├── rendered-math.ts
+│   │   │   ├── math-render.ts
+│   │   │   ├── mermaid-render.ts
+│   │   │   ├── rendered-highlight.ts
+│   │   │   ├── image-target.ts
+│   │   │   └── verse-block.ts
+│   │   ├── ipc.ts                 # Webview-to-plugin message wrapper
+│   │   └── note-context.ts
+│   ├── shared/
+│   │   ├── asciidoc-attributes.ts
+│   │   ├── asciidoc-sections.ts
+│   │   ├── asciidoc-links.ts
+│   │   ├── asciidoc-include.ts
+│   │   ├── joplin-note-links.ts
+│   │   ├── joplin-command-args.ts
+│   │   └── theme-types.ts
+│   └── styles/
+│       ├── editor.css             # Editor/ribbon/webview styling
+│       └── preview.css            # Rendered AsciiDoc styling
+├── tests/
+│   └── unit/                      # Vitest tests for parsers, preview behavior, macros, CSS checks
+├── scripts/
+│   ├── create-publish-artifacts.js
+│   ├── deploy-joplin.js
+│   ├── release.sh
+│   └── copy-asciidoctor.js
+├── dist/                          # Generated webpack output; recreated by npm run build
+├── publish/                       # Generated .jpl and publish manifest; recreated by npm run build
+└── node_modules/                  # Installed dependencies; recreated by npm install
+----
+
+Useful orientation points:
+
+* Most editor-facing behavior lives in `+src/lib/editor/live-preview.ts+`, `+src/panel.ts+`, and the toolbar panel files under `+src/lib/toolbar/panels/+`.
+* Joplin integration lives mainly in `+src/index.ts+`, including command registration, settings, Markdown conversion, resource handling, include expansion, and Asciidoctor.js rendering.
+* Shared parsing helpers live under `+src/shared/+` so tests and runtime code use the same section, link, attribute, note-link, and command-argument logic.
+* Macro-specific serialization/parsing helpers live under `+src/lib/utils/+`; these are covered by focused unit tests.
+* `+dist/+`, `+publish/+`, and `+node_modules/+` are generated or installed directories. Do not edit them as source.
 
 '''
 
@@ -552,9 +729,18 @@ Communication between the plugin sandbox and the webview editor uses Joplin's `p
 [source,bash]
 ----
 npm install        # Install dependencies
-npm run build      # Production build -> .jpl
+npm run build      # Production build -> publish/com.asciidoc.joplin-plugin.jpl
 npm run deploy:joplin # Build and copy the .jpl into local Joplin desktop plugin folders
 npm run dev        # Watch mode for development
+----
+
+Useful verification commands:
+
+[source,bash]
+----
+npm run test:unit  # Vitest unit suite
+npm run typecheck  # TypeScript check
+npm pack --dry-run # Confirm npm package contents
 ----
 
 After every build, restart Joplin to load the updated plugin.
@@ -572,12 +758,23 @@ npm publish        # Builds, packages .jpl into publish/, and publishes to npm
 
 The Joplin plugin directory automatically discovers packages on npm with the `joplin-plugin` keyword.
 
+For the scripted release flow:
+
+[source,bash]
+----
+npm run release        # patch release
+npm run release:minor  # minor release
+npm run release:major  # major release
+----
+
+The release script requires a clean `master` branch, updates `package.json` and `src/manifest.json`, runs unit tests and typecheck, builds `publish/com.asciidoc.joplin-plugin.jpl`, commits, tags, pushes, creates a GitHub release, and publishes to npm.
+
 To create a GitHub release for manual installation:
 
 [source,bash]
 ----
 npm run build
-gh release create v1.0.0 ./com.asciidoc.joplin-plugin.jpl --title "v1.0.0" --notes "Initial release"
+gh release create v1.0.3 ./publish/com.asciidoc.joplin-plugin.jpl --title "v1.0.3" --notes "Release v1.0.3"
 ----
 
 '''
