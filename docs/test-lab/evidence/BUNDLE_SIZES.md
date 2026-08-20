@@ -26,25 +26,32 @@ JPL       927e91512e799ff8acda8c798893cdc68339ee92ca4bf92d45c1f43106e67c68
 
 The growth is attributable to the approved production dependency and boundary code. Artifact inspection confirms that it is not caused by laboratory assets.
 
-## 1.0.4 pre-source-commit security refresh
+## 1.0.4 pre-replacement-source-commit security refresh
 
-Measured after the 1.0.4 metadata update and compatible lock refresh, before
-the required user-owned clean source commit:
+The initial clean source commit
+`156016648b87f5a039a5112762c8caa9e0c1b546` reached the pinned Noble generator,
+where a contract test exposed an assumption that system ZIP tools were present.
+The corrected importer uses a dev-only pure-JavaScript ZIP implementation with
+bounded, fail-closed metadata validation. That change does not enter the JPL,
+but it intentionally invalidates the initial commit and every artifact bound to
+it. These measurements are from the fully verified corrected worktree, before
+the replacement user-owned source commit:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
 | `dist/index.js` | 1,583,433 | `ce0cffcb026e80d7a40a53da771fd167a88d8becafc4b41646b776ef72ea0aa2` |
 | `dist/panel.js` | 6,610,626 | `348007c568dbc6b9ab15234ae8e761e701538ecd0d38ff1ba51b4cff64ddd198` |
-| generated JPL | 3,121,990 | `51956c7b95e0906180485dab2b3bff2b0ea9b52dd28ae79d92f1f12217e74f00` |
-| npm tarball | 3,137,965 | `0c01ec1bd098c7ff2775e2f53ed3ec935b479e3d46887670d4c1d6e32004fcb5` |
-| publish manifest | 749 | `1294a772d7a18eee2b115798206047e3069f4dfe683a723ee7a20502e42cb23c` |
+| generated JPL | 3,122,023 | `d193ef7bf418c640dd27c58e71c91c2855cd4709564a05d2232fd27805ef45dc` |
+| npm tarball | 3,138,045 | `754d2ef11267355f694bd92771fc70b302fe0f415ad02ba6669dccc1879fb62d` |
+| publish manifest | 749 | `e80152d1fa6267565cc85cc750cc8a4c46b9373a0202db6c38a5c5fd8b83a768` |
 
 The JPL archive is reproducible: file ordering, ownership, and modification
 times are normalized to the source commit before gzip is created without a
-timestamp. These hashes therefore prove the local pre-commit build but are not
-the canonical release hashes: the clean source commit changes the normalized
-archive timestamp and publish-commit metadata. The canonical candidate and
-receipt will supersede them and bind the exact publishable JPL and npm tarball.
+timestamp. These hashes therefore prove the corrected local build but are not
+the canonical release hashes: the replacement clean source commit changes the
+normalized archive timestamp and publish-commit metadata. The canonical
+candidate and receipt will supersede them and bind the exact publishable JPL and
+npm tarball.
 
 `npm pack --dry-run --json` confirms that the tarball contains exactly
 `LICENSE`, `README.adoc`, `package.json`, and the two files under `publish/`; no

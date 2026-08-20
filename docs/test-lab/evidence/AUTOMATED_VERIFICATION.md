@@ -6,10 +6,11 @@ Verified on 2026-08-20 with Node 26.7.0, npm 12.0.2, Playwright 1.61.1, and Chro
 
 ## Final matrix
 
-The aggregate command was interrupted by a host-session crash during `dist`,
-after its audit, unit, and typecheck stages had passed. `dist` and every remaining
-constituent gate were then rerun individually from the same `npm ci` install. The
-complete results were:
+After the first canonical attempt exposed an archive-import test that assumed a
+host `zip` executable, the importer and test fixture were made self-contained
+with the dev-only `fflate` package. The full `npm run test:lab:nightly` aggregate
+was then rerun successfully from a fresh `npm ci` install. The complete results
+were:
 
 - Production audits: PR, release, nightly, and direct `npm audit --omit=dev` all reported zero advisories at every severity. The unfiltered install retains one moderate and six high development-only advisories, which are outside the 1.0.4 production-release scope.
 - Unit and contract suite: 31 files, 268 passing tests and one intentional expected-failure sentinel (269 total).
@@ -29,8 +30,21 @@ complete results were:
 
 ## Candidate and review-boundary checks
 
-- Two consecutive local candidate runs produced and then reused digest `ae6c0584b2f69d5a2e7d77266039eea8d65642887f057d6ffbff123004df2806`.
-- The validated draft bundle contains 13 visual candidates, 30 scroll values, zero production advisories, the exact JPL, and the exact npm tarball. It correctly remains nonfinalizable because the source is uncommitted, the host is not the pinned Noble container, and release-scope generation was not requested.
+- Before the portability correction, two consecutive local candidate runs
+  produced and then reused digest
+  `ae6c0584b2f69d5a2e7d77266039eea8d65642887f057d6ffbff123004df2806`.
+  That draft is now intentionally obsolete and cannot be finalized against the
+  replacement source commit.
+- The first canonical run from source commit
+  `156016648b87f5a039a5112762c8caa9e0c1b546` failed closed during unit tests
+  because the pinned Noble image has neither `zip` nor `unzip`. No candidate was
+  finalized or reviewed from that attempt.
+- ZIP import now performs bounded central-directory validation and rejects
+  traversal, duplicate/colliding paths, encryption, unsupported compression,
+  symlinks, special entries, and inconsistent sizes before writing regular files.
+  Its contract passed directly inside `mcr.microsoft.com/playwright:v1.61.1-noble`
+  without system ZIP tools, and an independently generated Info-ZIP candidate
+  bundle imported and revalidated successfully.
 - Live loopback review requests returned the page, run list, manifest, and a whitelisted PNG. An unlisted file and a traversal path returned 404; POST returned 405; offline CSP and no-store headers were present.
 - Dirty-tree release preparation and canonical generation failed before building. Direct `npm publish --dry-run` was blocked by the publication guard.
 
@@ -49,7 +63,8 @@ Final production artifact measurements are recorded in [BUNDLE_SIZES.md](BUNDLE_
 
 Automation cannot complete or self-approve these required records:
 
-- The user-owned clean 1.0.4 source commit.
+- The replacement user-owned clean 1.0.4 source commit that includes the Noble
+  archive-portability correction.
 - Canonical Noble generation and individual browser review of all 13 visuals plus the characterized scroll evidence.
 - Targeted Windows and macOS hardened-JPL delta evidence.
 - Receipt application and the user-owned evidence-only commit.

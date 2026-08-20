@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { zipSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
 import { VISUAL_CANDIDATE_IDS } from "../../baseline/contracts";
 import { importBundle } from "../../baseline/import-bundle";
@@ -76,6 +77,31 @@ function buildBundle(workspace: string): string {
   return destination;
 }
 
+function zipDirectory(root: string, directory: string, destination: string): void {
+  const files: Record<string, Uint8Array> = {};
+  const walk = (current: string): void => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const absolute = path.join(current, entry.name);
+      if (entry.isDirectory()) walk(absolute);
+      else {
+        const relative = path.relative(root, absolute).split(path.sep).join("/");
+        files[relative] = fs.readFileSync(absolute);
+      }
+    }
+  };
+  walk(path.join(root, directory));
+  fs.writeFileSync(destination, zipSync(files, { level: 6 }));
+}
+
+function writeZipSymlink(destination: string): void {
+  const bytes = Buffer.from(zipSync({ "candidate-link": Buffer.from("payload") }, { level: 0 }));
+  const centralHeader = bytes.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+  if (centralHeader < 0) throw new Error("Test ZIP has no central directory entry");
+  bytes.writeUInt16LE(0x0314, centralHeader + 4);
+  bytes.writeUInt32LE((0o120777 << 16) >>> 0, centralHeader + 38);
+  fs.writeFileSync(destination, bytes);
+}
+
 describe("candidate bundle import", () => {
   it("imports validated directories idempotently and rejects source tampering", () => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "adoclive-import-directory-"));
@@ -100,7 +126,7 @@ describe("candidate bundle import", () => {
     const tarball = path.join(workspace, "candidate.tgz");
     const zip = path.join(workspace, "candidate.zip");
     run(workspace, "tar", ["-czf", tarball, digest]);
-    run(workspace, "zip", ["-qr", zip, digest]);
+    zipDirectory(workspace, digest, zip);
     expect(validateBundleDirectory(importBundle(tarball, path.join(workspace, "tar-target")), true).bundleDigest).toBe(digest);
     expect(validateBundleDirectory(importBundle(zip, path.join(workspace, "zip-target")), true).bundleDigest).toBe(digest);
 
@@ -111,11 +137,20 @@ describe("candidate bundle import", () => {
     expect(() => importBundle(traversal, path.join(workspace, "traversal-target"))).toThrow(/unsafe path/);
     expect(fs.existsSync(path.join(workspace, "escaped.txt"))).toBe(false);
 
+    const zipTraversal = path.join(workspace, "traversal.zip");
+    fs.writeFileSync(zipTraversal, zipSync({ "../escaped-zip.txt": Buffer.from("escape attempt") }, { level: 0 }));
+    expect(() => importBundle(zipTraversal, path.join(workspace, "zip-traversal-target"))).toThrow(/unsafe path/);
+    expect(fs.existsSync(path.join(workspace, "escaped-zip.txt"))).toBe(false);
+
     const link = path.join(workspace, "candidate-link");
     fs.symlinkSync(payload, link);
     const symlinkArchive = path.join(workspace, "symlink.tgz");
     run(workspace, "tar", ["-czf", symlinkArchive, "candidate-link"]);
     fs.unlinkSync(link);
     expect(() => importBundle(symlinkArchive, path.join(workspace, "symlink-target"))).toThrow(/regular files and directories/);
+
+    const symlinkZip = path.join(workspace, "symlink.zip");
+    writeZipSymlink(symlinkZip);
+    expect(() => importBundle(symlinkZip, path.join(workspace, "zip-symlink-target"))).toThrow(/regular files and directories/);
   });
 });
