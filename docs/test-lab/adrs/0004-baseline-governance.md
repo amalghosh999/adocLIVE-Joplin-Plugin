@@ -9,6 +9,12 @@ regression ceilings come from reviewed 30-run source-anchor displacement using:
 ceiling = p99 + max(1 px, MAD)
 ```
 
+The raw/live/raw endpoints use the same raw document geometry. The collector
+records and gates that geometry stability, then measures the anchor's viewport
+displacement as the absolute `scrollTop` delta. This is equivalent to comparing
+the same line's viewport coordinates and remains observable when CodeMirror
+virtualizes a severely displaced anchor out of the DOM.
+
 That ceiling characterizes current behavior and prevents an unreviewed
 regression; it is not the desired correctness contract. The independent
 quarter-line source-anchor target remains an expected-failing ADL-022 assertion,

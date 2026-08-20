@@ -271,6 +271,14 @@ export async function generateCandidates(): Promise<string> {
 
     const scrollEvidencePath = path.join(temporaryRoot, "scroll", "scroll-characterization.json");
     const scrollResult = JSON.parse(fs.readFileSync(scrollEvidencePath, "utf8"));
+    if (scrollResult.runs !== 30 || !Array.isArray(scrollResult.valuesPx) || scrollResult.valuesPx.length !== 30
+      || scrollResult.valuesPx.some((value: unknown) => typeof value !== "number" || !Number.isFinite(value) || value < 0)) {
+      throw new Error("Scroll characterization must contain exactly 30 finite, non-negative displacement values");
+    }
+    if (typeof scrollResult.maxRawScrollHeightDeltaPx !== "number" || !Number.isFinite(scrollResult.maxRawScrollHeightDeltaPx)
+      || scrollResult.maxRawScrollHeightDeltaPx > 1) {
+      throw new Error(`Scroll characterization raw geometry was unstable: ${scrollResult.maxRawScrollHeightDeltaPx}`);
+    }
     const roundingMarginPx = 1;
     const scroll = {
       id: "scroll-raw-live-raw-mid-document" as const,

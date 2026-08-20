@@ -27,7 +27,7 @@ Semantic timeline actions include editor typing, selection, source-position clic
 
 ## Stabilization and scroll
 
-A stable editor has loaded local fonts and deterministic media, completed two animation frames, observed a quiet relevant-mutation window, and has no pending host or render work. Scroll assertions compare a visible source anchor before and after a transition; raw `scrollTop` is only diagnostic.
+A stable editor has loaded local fonts and deterministic media, completed two animation frames, observed a quiet relevant-mutation window, and has no pending host or render work. Scroll assertions compare a visible source anchor before and after a transition. For the raw/live/raw characterization, both endpoints have identical verified raw geometry, so the source-anchor displacement is the absolute `scrollTop` delta; this remains valid when CodeMirror virtualizes the displaced anchor out of the DOM. Raw `scrollTop` without that same-geometry proof is diagnostic only.
 
 Scenario regression ceilings are derived from 30 pinned-container repetitions as `p99 + max(1 px, MAD)`. They characterize current behavior and fail a regression beyond that reviewed ceiling. The desired displacement target is a separate one-quarter-line ADL-022 expected-failing assertion; mathematically correct bottom clamping is the separate ADL-023 expected-failing assertion. Neither safety contract is waived by approving a characterization. Scroll tests run with one worker and retain source, geometry history, diagnostics, screenshot, and trace on failure.
 

@@ -34,8 +34,11 @@ where a contract test exposed an assumption that system ZIP tools were present.
 The corrected importer uses a dev-only pure-JavaScript ZIP implementation with
 bounded, fail-closed metadata validation. That change does not enter the JPL,
 but it intentionally invalidates the initial commit and every artifact bound to
-it. These measurements are from the fully verified corrected worktree, before
-the replacement user-owned source commit:
+it. The subsequent source commit also exposed a virtualized-anchor limitation in
+candidate-only scroll collection; its same-geometry measurement correction is
+likewise Test Lab-only and does not enter the JPL. These measurements are from
+the fully verified production build before the final replacement user-owned
+source commit:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|

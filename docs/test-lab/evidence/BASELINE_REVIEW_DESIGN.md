@@ -26,8 +26,9 @@ Superdesign project: [adocLIVE Test Lab — Baseline Review](https://superdesign
 - Make the evidence image or scroll visualization the central visual priority.
   The decision rail holds notes, immutable provenance, native evidence, known-
   issue acknowledgements, and finalization blockers.
-- Present the 690.3125 px scroll ceiling as characterization only. ADL-022 and
-  ADL-023 remain desired-behavior expected failures.
+- Present the exact bundle-derived scroll ceiling as characterization only (the
+  approved mockup used 690.3125 px sample data). ADL-022 and ADL-023 remain
+  desired-behavior expected failures.
 - Keep browser actions local and read-only: draft import/export and receipt
   download only, with no publication or repository mutation.
 

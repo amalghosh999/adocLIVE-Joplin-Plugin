@@ -45,6 +45,22 @@ were:
   Its contract passed directly inside `mcr.microsoft.com/playwright:v1.61.1-noble`
   without system ZIP tools, and an independently generated Info-ZIP candidate
   bundle imported and revalidated successfully.
+- The next canonical run from source commit
+  `83eeb171bd40f48726b0dbbe03cc1b6bae62bdf5` passed the build, audit, unit,
+  typecheck, simulator, 39-test browser, accessibility, packaged-artifact, and
+  13-image visual gates. It then failed closed before bundle finalization because
+  a severely displaced source anchor left CodeMirror's virtualized DOM during
+  the 30-run scroll capture. No partial evidence was retained or reviewed.
+- The collector now uses the mathematically equivalent raw-to-raw `scrollTop`
+  delta only while independently requiring stable raw geometry. A direct Noble
+  capture completed all 30 runs with zero raw scroll-height drift and emitted
+  all four key frames plus the JSON evidence. Generator validation rejects a
+  missing, incomplete, non-finite, negative, or geometry-unstable capture.
+- Two consecutive complete Noble draft assemblers then produced and reused
+  digest `0eb9c36cb4fdec01152f4efe5b60442ff19962b322d9bf4ed35d42ca99ae7985`.
+  The validated bundle contains every required visual, scroll, audit, manifest,
+  JPL, and npm artifact and remains correctly nonfinalizable because the source
+  correction is uncommitted and release-scoped generation was not requested.
 - Live loopback review requests returned the page, run list, manifest, and a whitelisted PNG. An unlisted file and a traversal path returned 404; POST returned 405; offline CSP and no-store headers were present.
 - Dirty-tree release preparation and canonical generation failed before building. Direct `npm publish --dry-run` was blocked by the publication guard.
 

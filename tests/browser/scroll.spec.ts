@@ -25,15 +25,6 @@ async function visibleAnchor(lab: LabPage) {
   });
 }
 
-async function anchorByText(lab: LabPage, text: string) {
-  return lab.editor().locator(".cm-scroller").evaluate((scroller, anchorText) => {
-    const line = [...scroller.querySelectorAll<HTMLElement>(".cm-line")].find(candidate => candidate.textContent === anchorText);
-    if (!line) throw new Error(`Source anchor disappeared: ${anchorText}`);
-    const rect = line.getBoundingClientRect();
-    return { top: rect.top, height: rect.height, scrollTop: (scroller as HTMLElement).scrollTop, scrollHeight: (scroller as HTMLElement).scrollHeight };
-  }, text);
-}
-
 async function clickMode(lab: LabPage, testId: string): Promise<void> {
   const frame = lab.editor();
   await frame.getByRole("button", { name: "View", exact: true }).click();
@@ -67,6 +58,7 @@ test("@scroll characterizes 30 raw/live/raw source-anchor transitions", async ({
   await lab.editor().locator("body").evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   const displacements: number[] = [];
+  const rawScrollHeightDeltas: number[] = [];
   const candidateDir = process.env.ADOC_SCROLL_CANDIDATE_DIR;
   const runFrameDir = candidateDir ? path.join(candidateDir, "run-frames") : "";
   if (candidateDir) {
@@ -85,9 +77,16 @@ test("@scroll characterizes 30 raw/live/raw source-anchor transitions", async ({
     if (candidateDir) await page.locator("iframe[data-session-id=editor-1]").screenshot({ path: path.join(runFrameDir, `${run}-before.png`), animations: "disabled", caret: "hide" });
     await clickMode(lab, "view-mode-live-preview");
     await clickMode(lab, "view-mode-raw-only");
-    const after = await anchorByText(lab, before.text);
-    const displacement = Math.abs(after.top - before.top);
+    const after = await lab.editor().locator(".cm-scroller").evaluate(scroller => ({
+      scrollTop: (scroller as HTMLElement).scrollTop,
+      scrollHeight: (scroller as HTMLElement).scrollHeight,
+    }));
+    // Both endpoints use the same raw document geometry, so their scrollTop
+    // delta is the anchor's viewport displacement even when CodeMirror has
+    // virtualized that source line out of the DOM after a large jump.
+    const displacement = Math.abs(after.scrollTop - before.scrollTop);
     displacements.push(displacement);
+    rawScrollHeightDeltas.push(Math.abs(after.scrollHeight - before.scrollHeight));
     if (candidateDir) await page.locator("iframe[data-session-id=editor-1]").screenshot({ path: path.join(runFrameDir, `${run}-after.png`), animations: "disabled", caret: "hide" });
   }
 
@@ -99,6 +98,7 @@ test("@scroll characterizes 30 raw/live/raw source-anchor transitions", async ({
     p99Px: percentile(displacements, 0.99),
     madPx: median(displacements.map(value => Math.abs(value - median(displacements)))),
     rawLineHeightPx: representativeLineHeight,
+    maxRawScrollHeightDeltaPx: Math.max(...rawScrollHeightDeltas),
     browser: testInfo.project.name,
     approvedBaseline: baseline.approved,
   };
@@ -117,6 +117,7 @@ test("@scroll characterizes 30 raw/live/raw source-anchor transitions", async ({
     fs.rmSync(runFrameDir, { recursive: true, force: true });
   }
   expect(Math.max(...displacements), "an unexplained jump exceeded one quarter of a raw line").toBeLessThanOrEqual(representativeLineHeight / 4 + 0.5);
+  expect(result.maxRawScrollHeightDeltaPx, "raw layout geometry changed across the characterized transition").toBeLessThanOrEqual(1);
   if (baseline.approved) {
     expect(result.p99Px).toBeLessThanOrEqual(baseline.scenarios[result.scenario].maxDisplacementPx);
   }

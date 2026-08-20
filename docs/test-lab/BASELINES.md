@@ -4,7 +4,7 @@ Scroll, visual, and relative performance files are reviewed evidence, not automa
 
 ## Scroll
 
-Run `npm run test:scroll` in the canonical image. Review all 30-run displacement values, p99, MAD, raw line height, screenshots/traces, and anomalies. The characterized regression ceiling is `p99 + max(1 px, MAD)`. It protects current behavior only. The desired one-quarter-line source-anchor contract remains the independently expected-failing ADL-022 assertion, and bottom-clamp correctness remains ADL-023. Approval must not call either defect correct.
+Run `npm run test:scroll` in the canonical image. Review all 30-run displacement values, p99, MAD, raw line height, raw-geometry stability, screenshots/traces, and anomalies. Raw/live/raw displacement uses the absolute `scrollTop` delta only because both raw endpoints have independently verified identical geometry; this preserves the visual-anchor measurement when CodeMirror virtualizes the displaced line. The characterized regression ceiling is `p99 + max(1 px, MAD)`. It protects current behavior only. The desired one-quarter-line source-anchor contract remains the independently expected-failing ADL-022 assertion, and bottom-clamp correctness remains ADL-023. Approval must not call either defect correct.
 
 ## Visual
 
