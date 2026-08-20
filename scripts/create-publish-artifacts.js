@@ -46,13 +46,36 @@ if (topLevelEntries.length === 0) {
   throw new Error("dist/ is empty");
 }
 
-const tar = spawnSync("tar", ["-czf", archivePath, "-C", distDir, ...topLevelEntries], {
+const sourceEpochResult = spawnSync("git", ["log", "-1", "--format=%ct"], {
+  cwd: repoRoot,
+  encoding: "utf8",
+});
+const sourceEpoch = process.env.SOURCE_DATE_EPOCH || (sourceEpochResult.status === 0 ? sourceEpochResult.stdout.trim() : "0");
+if (!/^\d+$/.test(sourceEpoch)) throw new Error(`Invalid SOURCE_DATE_EPOCH: ${sourceEpoch}`);
+
+const tarPath = `${archivePath}.tar`;
+const tar = spawnSync("tar", [
+  "--sort=name",
+  `--mtime=@${sourceEpoch}`,
+  "--owner=0",
+  "--group=0",
+  "--numeric-owner",
+  "--format=gnu",
+  "-cf",
+  tarPath,
+  "-C",
+  distDir,
+  ...topLevelEntries,
+], {
   cwd: repoRoot,
   stdio: "inherit",
 });
 if (tar.status !== 0) {
   throw new Error(`tar failed with exit code ${tar.status}`);
 }
+const gzip = spawnSync("gzip", ["-n", "-9", tarPath], { cwd: repoRoot, stdio: "inherit" });
+if (gzip.status !== 0) throw new Error(`gzip failed with exit code ${gzip.status}`);
+fs.renameSync(`${tarPath}.gz`, archivePath);
 
 const publishHash = `sha256:${crypto.createHash("sha256").update(fs.readFileSync(archivePath)).digest("hex")}`;
 const headResult = spawnSync("git", ["rev-parse", "HEAD"], {

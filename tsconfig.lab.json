@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "rootDir": ".",
+    "outDir": "./test-lab-dist/types",
+    "types": ["node", "@playwright/test"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test-lab/**/*.ts",
+    "tests/browser/**/*.ts",
+    "tests/joplin-sim/**/*.ts",
+    "tests/artifact/**/*.ts",
+    "playwright.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "publish", "test-lab-dist", "test-results", "playwright-report"]
+}

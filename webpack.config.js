@@ -8,6 +8,7 @@ module.exports = (env, argv) => {
   return [
     // index.js — plugin sandbox (runs in Joplin's plugin sandbox)
     {
+      name: "plugin-host",
       entry: "./src/index.ts",
       target: "node",
       output: {
@@ -31,6 +32,7 @@ module.exports = (env, argv) => {
     },
     // panel.js — editor webview (runs in browser-like context)
     {
+      name: "editor-panel",
       entry: "./src/panel.ts",
       target: "web",
       output: {

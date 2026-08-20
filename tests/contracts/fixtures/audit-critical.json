@@ -1,0 +1,25 @@
+{
+  "vulnerabilities": {
+    "critical-package": {
+      "name": "critical-package",
+      "severity": "critical",
+      "via": [
+        {
+          "source": 7654321,
+          "url": "https://github.com/advisories/GHSA-dddd-eeee-ffff",
+          "severity": "critical"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 1,
+      "total": 1
+    }
+  }
+}

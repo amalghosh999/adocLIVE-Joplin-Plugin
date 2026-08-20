@@ -21,11 +21,8 @@ import { isSmartQuotesEnabled } from "./lib/toolbar/panels/formatting-panel";
 import { saveNoteContent, requestResources, createResourceFromBytes, getPersonalDictionary, addWordToPersonalDictionary, getSpellcheckSettings, setFullscreenMode, convertMarkdownPaste, renderAsciidoc, getSnippets, addSnippet, type Snippet } from "./lib/ipc";
 import { setCurrentNoteId } from "./lib/note-context";
 import { setMermaidThemeConfig } from "./lib/utils/mermaid-render";
-
-declare const webviewApi: {
-  postMessage(msg: any): Promise<any>;
-  onMessage(callback: (msg: any) => void): void;
-};
+import { getEditorTransport, subscribeToHostPush } from "./lib/editor-transport";
+import { emitEditorDiagnostic } from "./shared/editor-diagnostics";
 
 // =====================================================
 // State
@@ -1356,6 +1353,7 @@ function scheduleRenderedPreviewRender(delay = 250) {
     const pane = document.getElementById("preview-pane");
     if (!pane) return;
     const source = editorView.state.doc.toString();
+    emitEditorDiagnostic("preview", "split-render", "start", { sequence: seq, sourceLength: source.length });
     try {
       const { html } = await renderAsciidoc(source);
       if (seq !== renderedPreviewSeq) return;
@@ -1370,14 +1368,17 @@ function scheduleRenderedPreviewRender(delay = 250) {
           if (dataUrl) media.setAttribute("src", dataUrl);
         }
       }
+      emitEditorDiagnostic("preview", "split-render", "end", { sequence: seq, htmlLength: html.length });
     } catch (error) {
       if (seq !== renderedPreviewSeq) return;
+      emitEditorDiagnostic("preview", "split-render", "error", { sequence: seq, message: String(error) });
       pane.innerHTML = `<div class="render-error"><h3>Render Error</h3><pre>${String(error).replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch] || ch))}</pre></div>`;
     }
   }, delay);
 }
 
 function syncEditorPresentationMode(options: { restoreFocus?: boolean } = {}) {
+  emitEditorDiagnostic("editor", "presentation-mode", "start", { editorViewMode, splitViewSubmode });
   updateEditorLayoutVisibility();
   if (editorView) {
     editorView.dispatch({
@@ -1390,6 +1391,7 @@ function syncEditorPresentationMode(options: { restoreFocus?: boolean } = {}) {
       }
       if (isRenderedPreviewVisible()) scheduleRenderedPreviewRender(0);
       if (options.restoreFocus !== false && isRawPaneVisible()) editorView?.focus();
+      emitEditorDiagnostic("editor", "presentation-mode", "end", { editorViewMode, splitViewSubmode });
     });
   }
   if (!isRenderedPreviewVisible()) {
@@ -1437,6 +1439,7 @@ function installSplitDivider() {
 // =====================================================
 
 function createEditor(container: HTMLElement, content: string) {
+  emitEditorDiagnostic("editor", "create", "start", { contentLength: content.length });
   if (editorView) {
     editorView.destroy();
     editorView = null;
@@ -1813,6 +1816,7 @@ function createEditor(container: HTMLElement, content: string) {
     state,
     parent: container,
   });
+  emitEditorDiagnostic("editor", "create", "end", { contentLength: content.length });
 
   updateBlockShading();
   updateCompactSpacing();
@@ -1824,6 +1828,7 @@ function createEditor(container: HTMLElement, content: string) {
 
 function handleMessage(msg: any) {
   if (!msg || !msg.type) return;
+  emitEditorDiagnostic("transport", msg.type, "start", { direction: "push-apply" });
 
   if (msg.type === "updateNote") {
     const { id, body } = msg.value || {};
@@ -1905,6 +1910,7 @@ function handleMessage(msg: any) {
     updateSpellcheck();
     localStorage.setItem("asciidoc-spellcheck", String(spellcheckEnabled));
   }
+  emitEditorDiagnostic("transport", msg.type, "end", { direction: "push-apply" });
 }
 
 // =====================================================
@@ -2265,16 +2271,11 @@ function init() {
     document.querySelectorAll(".split-dropdown.open").forEach(el => el.classList.remove("open"));
   });
 
-  // Listen for push messages from plugin sandbox (updateNote, updateTheme)
-  // Joplin uses webviewApi.onMessage, not window "message" events.
-  // The message may be wrapped as { message: ... } or passed directly.
-  webviewApi.onMessage((msg: any) => {
-    const data = msg.message || msg;
-    handleMessage(data);
-  });
+  // Listen for validated host pushes through the selected transport.
+  subscribeToHostPush(handleMessage);
 
   // Notify plugin sandbox we're ready and process the response
-  webviewApi.postMessage({ type: "ready" }).then((response: any) => {
+  getEditorTransport().request({ type: "ready" }).then((response) => {
     if (!response) return;
 
     // Apply theme from response

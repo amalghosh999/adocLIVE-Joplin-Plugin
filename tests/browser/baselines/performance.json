@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "browser": "chromium",
+  "platform": "linux",
+  "container": "mcr.microsoft.com/playwright:v1.61.1-noble",
+  "approved": false,
+  "approvalEvidence": null,
+  "characterizedOn": "2026-07-10",
+  "warmupCount": 3,
+  "sampleCount": 12,
+  "calibrationRangeMs": [5, 40],
+  "inputMedianMs": {
+    "1000": 10.1,
+    "5000": 34.8,
+    "10000": 66.7,
+    "20000": 132.4
+  },
+  "inputP95Ms": {
+    "1000": 15.8,
+    "5000": 36.1,
+    "10000": 68.1,
+    "20000": 134.7
+  },
+  "relativeRegressionPercent": 20,
+  "relativeMinimumMs": 5
+}

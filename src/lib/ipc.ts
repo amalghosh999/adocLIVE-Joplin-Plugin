@@ -1,17 +1,17 @@
 /**
  * IPC abstraction layer for Joplin plugin webview.
  * All adapted files import from here instead of Tauri's invoke().
- * Communication happens via webviewApi.postMessage().
+ * Communication happens through the validated EditorTransport boundary.
  */
 
-declare const webviewApi: { postMessage(msg: any): Promise<any> };
+import { getEditorTransport } from "./editor-transport";
 
 export async function saveNoteContent(noteId: string, body: string): Promise<void> {
-  await webviewApi.postMessage({ type: "saveNote", noteId, body });
+  await getEditorTransport().request({ type: "saveNote", noteId, body });
 }
 
 export async function getNoteContent(noteId: string): Promise<{ id: string; title: string; body: string }> {
-  return webviewApi.postMessage({ type: "getNoteContent", noteId });
+  return getEditorTransport().request({ type: "getNoteContent", noteId });
 }
 
 export interface ResolvedXrefTarget {
@@ -29,68 +29,68 @@ export interface IncludeTarget {
 }
 
 export async function searchNotes(query: string, mode?: "autocomplete" | "search", fromNoteId?: string): Promise<{ notes: Array<{ id: string; title: string; isAsciiDoc: boolean }> }> {
-  return webviewApi.postMessage({ type: "searchNotes", query, mode, fromNoteId });
+  return getEditorTransport().request({ type: "searchNotes", query, mode, fromNoteId });
 }
 
 export async function getNoteSections(noteId: string): Promise<{ sections: Array<{ id: string; title: string; level: number; lineNumber?: number; reftext?: string }> }> {
-  return webviewApi.postMessage({ type: "getNoteSections", noteId });
+  return getEditorTransport().request({ type: "getNoteSections", noteId });
 }
 
 export async function getIncludeTargets(fromNoteId: string, query: string): Promise<{ targets: IncludeTarget[] }> {
-  return webviewApi.postMessage({ type: "getIncludeTargets", fromNoteId, query });
+  return getEditorTransport().request({ type: "getIncludeTargets", fromNoteId, query });
 }
 
 export async function resolveXrefTarget(fromNoteId: string, target: string): Promise<ResolvedXrefTarget | null> {
-  const result = await webviewApi.postMessage({ type: "resolveXrefTarget", fromNoteId, target });
+  const result = await getEditorTransport().request({ type: "resolveXrefTarget", fromNoteId, target });
   return result?.target ?? null;
 }
 
 export async function renderAsciidoc(source: string): Promise<{ html: string }> {
-  return webviewApi.postMessage({ type: "renderAsciidoc", source });
+  return getEditorTransport().request({ type: "renderAsciidoc", source });
 }
 
 export async function openImageDialog(): Promise<{ filePath: string | null }> {
-  return webviewApi.postMessage({ type: "openImageDialog" });
+  return getEditorTransport().request({ type: "openImageDialog" });
 }
 
 export async function openVideoDialog(): Promise<{ filePath: string | null }> {
-  return webviewApi.postMessage({ type: "openVideoDialog" });
+  return getEditorTransport().request({ type: "openVideoDialog" });
 }
 
 export async function openAudioDialog(): Promise<{ filePath: string | null }> {
-  return webviewApi.postMessage({ type: "openAudioDialog" });
+  return getEditorTransport().request({ type: "openAudioDialog" });
 }
 
 export async function createResourceFromFile(filePath: string): Promise<{ resourceId: string; title: string; dataUrl?: string }> {
-  return webviewApi.postMessage({ type: "createResourceFromFile", filePath });
+  return getEditorTransport().request({ type: "createResourceFromFile", filePath });
 }
 
 export async function createResourceFromBytes(fileName: string, mimeType: string, dataBase64: string): Promise<{ resourceId: string; title: string; dataUrl?: string }> {
-  return webviewApi.postMessage({ type: "createResourceFromBytes", fileName, mimeType, dataBase64 });
+  return getEditorTransport().request({ type: "createResourceFromBytes", fileName, mimeType, dataBase64 });
 }
 
 export async function requestResources(resourceIds: string[]): Promise<{ resources: Array<{ id: string; dataUrl: string }> }> {
-  return webviewApi.postMessage({ type: "requestResources", resourceIds });
+  return getEditorTransport().request({ type: "requestResources", resourceIds });
 }
 
 export async function navigateToNote(noteId: string): Promise<void> {
-  await webviewApi.postMessage({ type: "navigateToNote", noteId });
+  await getEditorTransport().request({ type: "navigateToNote", noteId });
 }
 
 export async function getTemplates(): Promise<{ templates: Array<{ id: string; title: string }> }> {
-  return webviewApi.postMessage({ type: "getTemplates" });
+  return getEditorTransport().request({ type: "getTemplates" });
 }
 
 export async function getTemplateContent(noteId: string): Promise<{ content: string }> {
-  return webviewApi.postMessage({ type: "getTemplateContent", noteId });
+  return getEditorTransport().request({ type: "getTemplateContent", noteId });
 }
 
 export async function markAsTemplate(): Promise<void> {
-  await webviewApi.postMessage({ type: "markAsTemplate" });
+  await getEditorTransport().request({ type: "markAsTemplate" });
 }
 
 export async function removeTemplate(noteId: string): Promise<void> {
-  await webviewApi.postMessage({ type: "removeTemplate", noteId });
+  await getEditorTransport().request({ type: "removeTemplate", noteId });
 }
 
 // Snippet Templates
@@ -101,37 +101,37 @@ export interface Snippet {
 }
 
 export async function getSnippets(): Promise<{ snippets: Snippet[] }> {
-  return webviewApi.postMessage({ type: "getSnippets" });
+  return getEditorTransport().request({ type: "getSnippets" });
 }
 
 export async function addSnippet(name: string, content: string): Promise<{ status: string; snippet?: Snippet; error?: string }> {
-  return webviewApi.postMessage({ type: "addSnippet", name, content });
+  return getEditorTransport().request({ type: "addSnippet", name, content });
 }
 
 export async function updateSnippet(id: string, name: string, content: string): Promise<{ status: string; error?: string }> {
-  return webviewApi.postMessage({ type: "updateSnippet", id, name, content });
+  return getEditorTransport().request({ type: "updateSnippet", id, name, content });
 }
 
 export async function removeSnippet(id: string): Promise<{ status: string }> {
-  return webviewApi.postMessage({ type: "removeSnippet", id });
+  return getEditorTransport().request({ type: "removeSnippet", id });
 }
 
 export async function getSpellcheckSettings(): Promise<{ pluralSingular: boolean; mode?: "nspell" | "native" }> {
-  return webviewApi.postMessage({ type: "getSpellcheckSettings" });
+  return getEditorTransport().request({ type: "getSpellcheckSettings" });
 }
 
 export async function getPersonalDictionary(): Promise<{ words: string[] }> {
-  return webviewApi.postMessage({ type: "getPersonalDictionary" });
+  return getEditorTransport().request({ type: "getPersonalDictionary" });
 }
 
 export async function addWordToPersonalDictionary(word: string): Promise<void> {
-  return webviewApi.postMessage({ type: "addWordToPersonalDictionary", word });
+  await getEditorTransport().request({ type: "addWordToPersonalDictionary", word });
 }
 
 export async function setFullscreenMode(enabled: boolean): Promise<void> {
-  return webviewApi.postMessage({ type: "setFullscreenMode", enabled });
+  await getEditorTransport().request({ type: "setFullscreenMode", enabled });
 }
 
 export async function convertMarkdownPaste(markdown: string): Promise<{ asciidoc: string }> {
-  return webviewApi.postMessage({ type: "convertMarkdownPaste", markdown });
+  return getEditorTransport().request({ type: "convertMarkdownPaste", markdown });
 }

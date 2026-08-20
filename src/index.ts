@@ -13,8 +13,12 @@ import {
   type JoplinNoteLinkCandidate,
 } from "./shared/joplin-note-links";
 import { normalizeNoteIdsFromCommandArgs } from "./shared/joplin-command-args";
-import { highlightRenderedSourceBlocksInHtml } from "./lib/utils/rendered-highlight";
-import { prepareAsciiDocMathForRendering } from "./lib/utils/rendered-math";
+import { renderAsciiDocHtml } from "./host/rendering";
+import { convertMarkdownToAsciiDoc } from "./host/markdown-conversion";
+import { EditorHandleRegistry } from "./host/editor-handle";
+import { createEditorHostOperations, EditorRpcService } from "./host/editor-rpc-service";
+import { createEditorHostApplication, createEditorHostPorts } from "./host/editor-host-application";
+import { expandEditorIncludes } from "./host/include-expansion";
 
 // Joplin MenuItemLocation values (defined locally to avoid requiring api/types at runtime)
 const MenuItemLocation = {
@@ -240,17 +244,6 @@ async function resolveXrefTargetForJoplin(fromNoteId: string, rawTarget: string)
   };
 }
 
-interface ParsedIncludeDirective {
-  rawDirective: string;
-  target: string;
-  optional: boolean;
-  lines?: string;
-  tag?: string;
-  tags?: string;
-  levelOffset?: string;
-  indent?: string;
-}
-
 interface ResolvedJoplinInclude {
   id: string;
   key: string;
@@ -258,8 +251,6 @@ interface ResolvedJoplinInclude {
   content: string;
   asciidoc: boolean;
 }
-
-const TAG_DIRECTIVE_PATTERN = /\b(tag|end)::([^\s\[]+)\[\](?=\s|$)/g;
 
 function normalizeIncludeTarget(rawTarget: string): string {
   return rawTarget.trim().replace(/^joplin:/i, "");
@@ -271,64 +262,6 @@ function normalizeResourceIncludeTarget(rawTarget: string): string {
     .replace(/^resource:/i, "")
     .replace(/^joplin-resource:/i, "")
     .replace(/^:\/?/, "");
-}
-
-function splitQuoted(value: string, separator: string): string[] {
-  const parts: string[] = [];
-  let current = "";
-  let quote: "\"" | "'" | null = null;
-  for (const char of value) {
-    if ((char === "\"" || char === "'") && (!quote || quote === char)) {
-      quote = quote ? null : char;
-      current += char;
-      continue;
-    }
-    if (!quote && char === separator) {
-      parts.push(current);
-      current = "";
-      continue;
-    }
-    current += char;
-  }
-  parts.push(current);
-  return parts;
-}
-
-function stripQuotedValue(value: string): string {
-  if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
-    return value.slice(1, -1);
-  }
-  return value;
-}
-
-function parseIncludeDirective(line: string): ParsedIncludeDirective | null {
-  const match = line.match(/^\s*include::([^\[]+)\[(.*)\]\s*$/);
-  if (!match) return null;
-  const attributes = new Map<string, string>();
-  for (const part of splitQuoted(match[2] || "", ",")) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq < 0) {
-      attributes.set(trimmed.toLowerCase(), "");
-    } else {
-      attributes.set(trimmed.slice(0, eq).trim().toLowerCase(), stripQuotedValue(trimmed.slice(eq + 1).trim()));
-    }
-  }
-  const opts = (attributes.get("opts") || "")
-    .split(/[;,]/)
-    .map(part => part.trim().toLowerCase())
-    .filter(Boolean);
-  return {
-    rawDirective: line.trim(),
-    target: stripQuotedValue(match[1].trim()),
-    optional: opts.includes("optional"),
-    lines: attributes.get("lines"),
-    tag: attributes.get("tag"),
-    tags: attributes.get("tags"),
-    levelOffset: attributes.get("leveloffset"),
-    indent: attributes.get("indent"),
-  };
 }
 
 function normalizeLineEndings(value: string): string {
@@ -392,552 +325,12 @@ async function resolveIncludeTarget(fromNoteId: string, rawTarget: string): Prom
   return null;
 }
 
-function effectiveLevelOffset(currentOffset: number, rawValue?: string): number {
-  const value = (rawValue || "").trim();
-  if (!value) return currentOffset;
-  if (/^[+-]\d+$/.test(value)) return currentOffset + Number.parseInt(value, 10);
-  if (/^-?\d+$/.test(value)) return Number.parseInt(value, 10);
-  return currentOffset;
-}
-
-function applyLevelOffsetToHeading(line: string, levelOffset: number): string {
-  if (!levelOffset) return line;
-  const match = line.match(/^(\s*)(={1,6})(\s+.*)$/);
-  if (!match) return line;
-  const currentLevel = match[2].length;
-  const nextLevel = Math.max(1, Math.min(6, currentLevel + levelOffset));
-  return `${match[1]}${"=".repeat(nextLevel)}${match[3]}`;
-}
-
-function extractTagDirectives(line: string): Array<{ kind: "tag" | "end"; name: string }> {
-  const directives: Array<{ kind: "tag" | "end"; name: string }> = [];
-  TAG_DIRECTIVE_PATTERN.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = TAG_DIRECTIVE_PATTERN.exec(line)) !== null) {
-    directives.push({ kind: match[1] as "tag" | "end", name: match[2] });
-  }
-  return directives;
-}
-
-function hasTagDirective(line: string): boolean {
-  TAG_DIRECTIVE_PATTERN.lastIndex = 0;
-  return TAG_DIRECTIVE_PATTERN.test(line);
-}
-
-function applyTagFilter(source: string, tagSpec: string): string {
-  const lines = normalizeLineEndings(source).split("\n");
-  const selectedTags = tagSpec.split(/[;,]/).map(tag => tag.trim()).filter(Boolean);
-  if (selectedTags.length === 0) return source;
-  if (selectedTags.includes("**")) return lines.filter(line => !hasTagDirective(line)).join("\n");
-
-  const activeTags = new Map<string, number>();
-  const wanted = new Set(selectedTags);
-  const filtered: string[] = [];
-  for (const line of lines) {
-    const directives = extractTagDirectives(line);
-    if (directives.length > 0) {
-      for (const directive of directives) {
-        const count = activeTags.get(directive.name) || 0;
-        if (directive.kind === "tag") activeTags.set(directive.name, count + 1);
-        else if (count <= 1) activeTags.delete(directive.name);
-        else activeTags.set(directive.name, count - 1);
-      }
-      continue;
-    }
-    if (Array.from(wanted).some(tag => (activeTags.get(tag) || 0) > 0)) filtered.push(line);
-  }
-  return filtered.join("\n");
-}
-
-function normalizeLineIndex(value: string | undefined, totalLines: number, defaultValue: number): number {
-  if (value == null || value === "") return defaultValue;
-  const numeric = Number.parseInt(value, 10);
-  if (!Number.isFinite(numeric)) return defaultValue;
-  if (numeric === -1) return totalLines;
-  return Math.max(1, Math.min(totalLines, numeric));
-}
-
-function applyLineFilter(source: string, lineSpec: string): string {
-  const lines = normalizeLineEndings(source).split("\n");
-  const selected = new Set<number>();
-  for (const spec of lineSpec.split(/[;,]/).map(part => part.trim()).filter(Boolean)) {
-    const rangeMatch = spec.match(/^(-?\d+)?\.\.(-?\d+)?$/);
-    if (rangeMatch) {
-      const start = normalizeLineIndex(rangeMatch[1], lines.length, 1);
-      const end = normalizeLineIndex(rangeMatch[2], lines.length, lines.length);
-      for (let lineNumber = start; lineNumber <= end; lineNumber++) selected.add(lineNumber);
-      continue;
-    }
-    if (/^-?\d+$/.test(spec)) selected.add(normalizeLineIndex(spec, lines.length, 1));
-  }
-  return lines.filter((_line, index) => selected.has(index + 1)).join("\n");
-}
-
-function applyIndent(source: string, indentSpec: string): string {
-  const indent = Number.parseInt(indentSpec, 10);
-  if (!Number.isFinite(indent) || indent < 0) return source;
-  const lines = normalizeLineEndings(source).split("\n");
-  let minimumIndent = Number.POSITIVE_INFINITY;
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const match = line.match(/^[ \t]+/);
-    if (!match) return source;
-    minimumIndent = Math.min(minimumIndent, match[0].length);
-  }
-  if (!Number.isFinite(minimumIndent)) return source;
-  return lines
-    .map(line => {
-      if (!line) return line;
-      const stripped = line.startsWith(" ") || line.startsWith("\t")
-        ? line.slice(Math.min(minimumIndent, line.length))
-        : line;
-      return `${" ".repeat(indent)}${stripped}`;
-    })
-    .join("\n");
-}
-
-function applyIncludeTransforms(source: string, directive: ParsedIncludeDirective, levelOffset: number): { source: string; levelOffset: number } {
-  let selectedSource = normalizeLineEndings(source);
-  const tagSpec = (directive.tags || directive.tag || "").trim();
-  if (tagSpec) selectedSource = applyTagFilter(selectedSource, tagSpec);
-  if (directive.lines?.trim()) selectedSource = applyLineFilter(selectedSource, directive.lines.trim());
-  if (directive.indent?.trim()) selectedSource = applyIndent(selectedSource, directive.indent.trim());
-  const childLevelOffset = effectiveLevelOffset(levelOffset, directive.levelOffset);
-  return { source: selectedSource, levelOffset: childLevelOffset };
-}
-
-async function expandJoplinIncludes(source: string, fromNoteId: string, seen: Set<string> = new Set(), levelOffset = 0): Promise<string> {
-  const activeSeen = seen.size === 0 && NOTE_ID_RE.test(fromNoteId)
-    ? new Set([...seen, `note:${fromNoteId}`])
-    : seen;
-  const lines = source.split("\n");
-  const output: string[] = [];
-
-  for (const line of lines) {
-    const directive = parseIncludeDirective(line);
-    if (!directive) {
-      output.push(applyLevelOffsetToHeading(line, levelOffset));
-      continue;
-    }
-
-    const indent = line.match(/^(\s*)/)?.[1] || "";
-    const rawTarget = directive.target.trim();
-    const target = await resolveIncludeTarget(fromNoteId, rawTarget);
-    if (!target) {
-      if (!directive.optional) {
-        output.push(`${indent}[WARNING]`, `${indent}====`, `${indent}Missing include: ${rawTarget}`, `${indent}====`);
-      }
-      continue;
-    }
-    if (activeSeen.has(target.key)) {
-      output.push(`${indent}[WARNING]`, `${indent}====`, `${indent}Cyclic include skipped: ${target.title}`, `${indent}====`);
-      continue;
-    }
-
-    const nextSeen = new Set(activeSeen);
-    nextSeen.add(target.key);
-    const transformed = applyIncludeTransforms(target.content, directive, levelOffset);
-    const expanded = target.asciidoc
-      ? await expandJoplinIncludes(transformed.source, target.id, nextSeen, transformed.levelOffset)
-      : transformed.source;
-    for (const includedLine of expanded.split("\n")) {
-      output.push(indent ? indent + includedLine : includedLine);
-    }
-  }
-
-  return output.join("\n");
-}
-
-// =====================================================
-// Markdown → AsciiDoc conversion helpers
-// =====================================================
-
-/**
- * Convert Markdown headings (# ... ######) to AsciiDoc headings (= ... ======).
- * Only converts lines where # is a heading marker:
- * - Must be at the start of the line (after optional whitespace)
- * - Must be followed by a space
- * - Skips lines inside fenced code blocks (``` or ~~~)
- */
-function convertMarkdownHeadings(text: string): string {
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    // Track fenced code blocks to avoid converting inside them
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // Match Markdown heading: 1-6 # chars at start of line, followed by a space
-    const match = lines[i].match(/^(\s*)(#{1,6})\s+(.*)$/);
-    if (match) {
-      const [, leadingSpace, hashes, content] = match;
-      const level = hashes.length;
-      const equals = "=".repeat(level);
-      lines[i] = `${leadingSpace}${equals} ${content}`;
-    }
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Convert Markdown unordered lists using `-` markers to AsciiDoc `*` markers.
- *
- * Matches lines where `-` is a list marker:
- * - At the start of the line (after optional whitespace used for nesting)
- * - Followed by a space and then list content
- * - Indent level determines nesting depth (every 2 spaces = one extra level)
- *
- * Does NOT convert:
- * - Hyphens inside words (e.g., "side-effect")
- * - Lines inside fenced code blocks
- * - Horizontal rules (---, ----, etc.)
- * - Lines where `-` is not followed by a space (not a list marker)
- */
-function convertMarkdownLists(text: string): string {
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    // Track fenced code blocks to avoid converting inside them
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // Match a markdown list item: optional leading whitespace, then "- " followed by content
-    const match = lines[i].match(/^(\s*)- (.+)$/);
-    if (!match) continue;
-
-    const [, indent, content] = match;
-
-    // Skip horizontal rules (lines that are only dashes, possibly with spaces)
-    if (/^-[\s-]*$/.test(trimmed)) continue;
-
-    // Calculate nesting depth: base level is 1 star, each 2 spaces of indent adds a level
-    const depth = Math.floor(indent.length / 2) + 1;
-    const stars = "*".repeat(depth);
-    lines[i] = `${stars} ${content}`;
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Convert Markdown inline links [text](url) to AsciiDoc link:url[text].
- * Also converts images ![alt](url) to image::url[alt].
- * Always uses the link: macro to prevent Asciidoctor from misinterpreting
- * special characters (commas, percent-encoding, fragments) in URLs.
- * Skips lines inside fenced code blocks.
- * Must run BEFORE convertMarkdownCodeBlocks so code block tracking still uses ```.
- */
-function convertMarkdownLinks(text: string): string {
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // Convert images: ![alt](url "title")
-    // Markdown titles are stripped.
-    // If image is alone on line → block image (image::) with trailing text as caption
-    // If image is inline with other content → inline image (image:)
-    if (/!\[([^\]]*)\]\(/.test(lines[i])) {
-      const imageOnlyMatch = lines[i].match(/^\s*!\[([^\]]*)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)\s*$/);
-      if (imageOnlyMatch) {
-        // Standalone image → block macro
-        lines[i] = `image::${imageOnlyMatch[2]}[${imageOnlyMatch[1]}]`;
-      } else {
-        const imageWithCaptionMatch = lines[i].match(/^\s*!\[([^\]]*)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)\s*(.+)$/);
-        if (imageWithCaptionMatch && !/!\[/.test(imageWithCaptionMatch[3])) {
-          // Single image at start with trailing text (no other images) → block with caption
-          const caption = imageWithCaptionMatch[3].trim();
-          lines[i] = `${caption ? `.${caption}\n` : ""}image::${imageWithCaptionMatch[2]}[${imageWithCaptionMatch[1]}]`;
-        } else {
-          // Multiple images or image inline with text → inline image (image:)
-          lines[i] = lines[i].replace(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)/g, "image:$2[$1]");
-        }
-      }
-    }
-
-    // Convert links: [text](url "title") → link:url[text]
-    // Markdown titles are stripped
-    lines[i] = lines[i].replace(/(.?)\[([^\]]*)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)/g, (_match, before, linkText, url) => {
-      // Ensure a space before link: when preceded by text (AsciiDoc requires word boundary)
-      const needsSpace = before && !/\s/.test(before);
-      return `${before}${needsSpace ? " " : ""}link:${url}[${linkText}]`;
-    });
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Convert Markdown inline formatting to AsciiDoc equivalents.
- * - ***text*** (MD bold+italic) → *_text_* (AD bold+italic)
- * - **text**  (MD bold)         → *text* (AD constrained strong)
- * - ~~text~~  (MD strikethrough) → [line-through]#text# (AD)
- *
- * Note: single *text* (MD italic) is NOT converted because it conflicts
- * with AsciiDoc list markers and with the bold conversion output.
- * In AsciiDoc, *text* renders as bold which is acceptable.
- *
- * Processes outside of code blocks and inline code spans.
- */
-function convertMarkdownInlineFormatting(text: string): string {
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // Split line into code spans and non-code segments to avoid
-    // converting formatting inside inline code (`...`)
-    const segments = lines[i].split(/(`[^`]+`)/);
-    for (let j = 0; j < segments.length; j++) {
-      // Skip inline code segments (odd indices from the split)
-      if (segments[j].startsWith("`")) continue;
-
-      // Bold+italic: ***text*** → *_text_* (must run before bold)
-      segments[j] = segments[j].replace(/\*\*\*(.+?)\*\*\*/g, "*_$1_*");
-
-      // Bold: **text** → *text*
-      segments[j] = segments[j].replace(/\*\*(.+?)\*\*/g, "*$1*");
-
-      // Strikethrough: ~~text~~ → [.line-through]#text#
-      segments[j] = segments[j].replace(/~~(.+?)~~/g, "[.line-through]#$1#");
-    }
-    lines[i] = segments.join("");
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Convert Markdown fenced code blocks to AsciiDoc listing blocks.
- *   ```lang  →  [source,lang]\n----
- *   ```      →  ----
- *   ~~~lang  →  [source,lang]\n----
- * Must run AFTER all other line-based converters since it changes the
- * fence markers that those converters use for code-block tracking.
- */
-function convertMarkdownCodeBlocks(text: string): string {
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-  const result: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    if (!inCodeBlock) {
-      const openMatch = trimmed.match(/^(`{3,}|~{3,})\s*(\S*)\s*$/);
-      if (openMatch) {
-        inCodeBlock = true;
-        const lang = openMatch[2];
-        if (lang) {
-          result.push(`[source,${lang}]`);
-        }
-        result.push("----");
-        continue;
-      }
-    } else {
-      if (/^(`{3,}|~{3,})\s*$/.test(trimmed)) {
-        inCodeBlock = false;
-        result.push("----");
-        continue;
-      }
-    }
-
-    result.push(lines[i]);
-  }
-
-  return result.join("\n");
-}
-
-/**
- * Convert HTML elements commonly found in Markdown notes.
- * - <br/>, <br>, <br /> → newline
- * - Strip inline HTML tags (<a>, <span>, <div>, etc.) preserving content
- * Must run BEFORE other converters so they see clean text.
- */
-function convertHtmlElements(text: string): string {
-  let result = text;
-  // Convert <br> variants to newlines
-  result = result.replace(/<br\s*\/?>/gi, "\n");
-  // Strip common HTML tags, preserving their content
-  result = result.replace(/<\/?(?:a|span|div|p|em|strong|b|i|u|s|del|ins|sup|sub|small|big|center|font|mark|abbr)(?:\s[^>]*)?>/gi, "");
-  return result;
-}
-
-/**
- * Remove Markdown backslash escapes that have no meaning in AsciiDoc.
- * \* → *, \$ → $, \[ → [, \] → ], \- → -, \_ → _, \\ → \
- * Skips lines inside fenced code blocks.
- */
-function convertMarkdownEscapes(text: string): string {
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // Split on inline code to avoid processing inside backticks
-    const segments = lines[i].split(/(`[^`]+`)/);
-    for (let j = 0; j < segments.length; j++) {
-      if (segments[j].startsWith("`")) continue;
-      // Remove backslash before common escaped characters
-      segments[j] = segments[j].replace(/\\([*$\[\]\\_.!#\-+`~{}>])/g, "$1");
-    }
-    lines[i] = segments.join("");
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Convert Markdown linked images [![alt](imgUrl)](linkUrl)
- * to AsciiDoc image::imgUrl[alt, link=linkUrl].
- * Must run BEFORE convertMarkdownLinks to avoid nested bracket issues.
- */
-function convertMarkdownLinkedImages(text: string): string {
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // [![alt](imgUrl "title")](linkUrl "title") → image macro with link
-    // Markdown titles are stripped from both image and link URLs
-    // If it's the only thing on the line → block (image::), otherwise inline (image:)
-    const linkedImgRegex = /\[!\[([^\]]*)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)/g;
-    const linkedImgOnlyMatch = lines[i].match(/^\s*\[!\[([^\]]*)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)\]\(([^\s)]+)(?:\s+["'][^"']*["'])?\)\s*$/);
-    if (linkedImgOnlyMatch) {
-      // Single linked image alone on line → block macro
-      lines[i] = `image::${linkedImgOnlyMatch[2]}[${linkedImgOnlyMatch[1]}, link=${linkedImgOnlyMatch[3]}]`;
-    } else {
-      // Inline with other content → inline macro (image:)
-      lines[i] = lines[i].replace(linkedImgRegex, (_, alt, imgUrl, linkUrl) => {
-        return `image:${imgUrl}[${alt}${linkUrl ? ", link=" + linkUrl : ""}]`;
-      });
-    }
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Apply all Markdown → AsciiDoc conversions.
- */
-/**
- * Convert Markdown horizontal rules (---, ***, ___) to AsciiDoc (''').
- * Skips lines inside fenced code blocks.
- */
-function convertMarkdownHorizontalRules(text: string): string {
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(trimmed)) {
-      lines[i] = "'''";
-    }
-  }
-
-  return lines.join("\n");
-}
-
-function convertMarkdownToAsciidoc(text: string): string {
-  let result = text;
-  // HTML cleanup first so other converters see clean text
-  result = convertHtmlElements(result);
-  result = convertMarkdownEscapes(result);
-  result = convertMarkdownHeadings(result);
-  result = convertMarkdownLists(result);
-  result = convertMarkdownHorizontalRules(result);
-  result = convertMarkdownInlineFormatting(result);
-  // Linked images before regular images/links (nested brackets)
-  result = convertMarkdownLinkedImages(result);
-  result = convertMarkdownLinks(result);
-  // Code blocks last — changes fence markers that other converters rely on
-  result = convertMarkdownCodeBlocks(result);
-  return result;
-}
-
 // =====================================================
 // Asciidoctor.js rendering
 // =====================================================
 
-let asciidoctorInstance: any = null;
-
-function getAsciidoctor() {
-  if (!asciidoctorInstance) {
-    const Asciidoctor = require("asciidoctor");
-    asciidoctorInstance = Asciidoctor();
-  }
-  return asciidoctorInstance;
-}
-
 function renderAsciidoc(source: string, settings: Record<string, any> = {}): string {
-  try {
-    const asciidoctor = getAsciidoctor();
-    const attributes: Record<string, string> = {
-      showtitle: "true",
-      icons: "font",
-      ...(settings.attributes || {}),
-    };
-    const preparedMath = prepareAsciiDocMathForRendering(source, { attributes });
-    const html = asciidoctor.convert(preparedMath.source, {
-      safe: "safe",
-      backend: "html5",
-      standalone: false,
-      attributes,
-    });
-    return highlightRenderedSourceBlocksInHtml(preparedMath.renderHtml(String(html)));
-  } catch (e: any) {
-    return `<div class="render-error"><h3>AsciiDoc Render Error</h3><pre>${
-      (e.message || String(e)).replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    }</pre></div>`;
-  }
+  return renderAsciiDocHtml(source, settings);
 }
 
 // =====================================================
@@ -1038,7 +431,7 @@ async function copyNotebookAsAsciiDoc(sourceFolderId: string, targetParentId: st
   for (const note of notes) {
     const body = isAsciiDocNote(note.body)
       ? note.body
-      : appendSentinel(convertMarkdownToAsciidoc(note.body), {});
+      : appendSentinel(convertMarkdownToAsciiDoc(note.body), {});
     await joplin.data.post(["notes"], null, {
       parent_id: newFolder.id,
       title: note.title,
@@ -1056,7 +449,7 @@ async function replaceNotebookWithAsciiDoc(folderId: string) {
   const notes = await getNotesInFolder(folderId);
   for (const note of notes) {
     if (isAsciiDocNote(note.body)) continue;
-    const converted = convertMarkdownToAsciidoc(note.body);
+    const converted = convertMarkdownToAsciiDoc(note.body);
     const newBody = appendSentinel(converted, {});
     await joplin.data.put(["notes", note.id], null, { body: newBody });
   }
@@ -1103,7 +496,7 @@ async function createAdocLiveCopy(noteId: string): Promise<string | null> {
 
   const body = isAsciiDocNote(note.body)
     ? note.body
-    : appendSentinel(convertMarkdownToAsciidoc(note.body), {});
+    : appendSentinel(convertMarkdownToAsciiDoc(note.body), {});
   const copy = await joplin.data.post(["notes"], null, {
     parent_id: note.parent_id,
     title: `${note.title || "Untitled"} (adocLIVE)`,
@@ -1118,7 +511,7 @@ async function replaceNoteWithAdocLive(noteId: string): Promise<{ id: string; pa
   });
   if (!note || isAsciiDocNote(note.body)) return null;
 
-  const converted = convertMarkdownToAsciidoc(note.body);
+  const converted = convertMarkdownToAsciiDoc(note.body);
   const newBody = appendSentinel(converted, {});
   await joplin.data.put(["notes", note.id], null, { body: newBody });
   return { id: note.id, parentId: note.parent_id };
@@ -1474,10 +867,13 @@ joplin.plugins.register({
     }
     let currentNoteId: string | null = null;
     let lastNote: { id: string; body: string; html: string } | null = null;
+    const editorHandles = new EditorHandleRegistry(editors);
 
     async function renderNote(body: string): Promise<string> {
       const { content, settings } = stripSentinel(body);
-      const expanded = await expandJoplinIncludes(content, currentNoteId || "");
+      const sourceNoteId = currentNoteId || "";
+      const seen = NOTE_ID_RE.test(sourceNoteId) ? new Set([`note:${sourceNoteId}`]) : new Set<string>();
+      const expanded = await expandEditorIncludes(content, sourceNoteId, resolveIncludeTarget, seen);
       return renderAsciidoc(expanded, settings);
     }
 
@@ -1485,43 +881,27 @@ joplin.plugins.register({
     await editors.register("asciidoc-editor", {
       async onSetup(handle: any) {
         const isDark = await joplin.shouldUseDarkColors();
-        const themeClass = isDark ? "dark-theme" : "light-theme";
+        const themeClass: "dark-theme" | "light-theme" = isDark ? "dark-theme" : "light-theme";
+        const editorHandle = editorHandles.create(handle);
 
-        // Ribbon + editor layout. The webview owns split/raw/preview mode state.
-        await editors.setHtml(
-          handle,
-          `<div id="asciidoc-editor-root" class="${themeClass}">
-            <div id="ribbon-container"></div>
-            <div id="editor-layout" class="editor-layout" data-view-mode="live-preview" data-split-view-submode="split">
-              <div id="editor-pane" class="editor-surface editor-surface--raw"></div>
-              <div id="editor-split-divider" class="editor-split-divider" hidden></div>
-              <div id="preview-pane-container" class="editor-surface editor-surface--preview" hidden>
-                <div id="preview-pane"></div>
-              </div>
-            </div>
-          </div>`
-        );
-
-        await editors.addScript(handle, "./panel.js");
-        await editors.addScript(handle, "./styles/editor.css");
-        await editors.addScript(handle, "./styles/preview.css");
-        await editors.addScript(handle, "./styles/katex.min.css");
+        // Shared exact shell and production assets. The webview owns presentation state.
+        await editorHandle.setup(themeClass);
 
         // Handle note updates from Joplin
-        await editors.onUpdate(handle, async (update: any) => {
+        await editorHandle.onUpdate(async (update: any) => {
           if (!isAsciiDocNote(update.newBody)) return;
           currentNoteId = update.noteId;
           const html = await renderNote(update.newBody);
           lastNote = { id: update.noteId, body: update.newBody, html };
-          editors.postMessage(handle, {
+          editorHandle.post({
             type: "updateNote",
             value: lastNote,
           });
         });
 
-        // Handle messages from webview
-        await editors.onMessage(handle, async (msg: any) => {
-          if (msg.kind === "ReturnValueResponse") return;
+        // Concrete Joplin operations retain their message-specific behavior while
+        // shared EditorRpcService owns request/response validation and routing.
+        const dispatchEditorMessage = async (msg: any) => {
 
           // Ready — send current note (always fetch fresh to avoid stale cache)
           if (msg.type === "ready") {
@@ -1556,7 +936,7 @@ joplin.plugins.register({
             if (!noteId) return { status: "error", error: "No note ID" };
             // Ensure the sentinel is present; if panel sent raw content, add it
             const body = isAsciiDocNote(msg.body) ? msg.body : appendSentinel(msg.body, {});
-            await editors.saveNote(handle, { noteId, body });
+            await editorHandle.save({ noteId, body });
             return { status: "saved" };
           }
 
@@ -2025,42 +1405,25 @@ joplin.plugins.register({
 
           // Convert Markdown to AsciiDoc (for paste conversion)
           if (msg.type === "convertMarkdownPaste") {
-            return { asciidoc: convertMarkdownToAsciidoc(msg.markdown || "") };
+            return { asciidoc: convertMarkdownToAsciiDoc(msg.markdown || "") };
           }
+        };
+        const joplinOperations = createEditorHostOperations(dispatchEditorMessage);
+        const rpcService = new EditorRpcService(createEditorHostApplication(createEditorHostPorts(joplinOperations)));
+        await editorHandle.onMessage(async (msg: any) => {
+          if (msg?.kind === "ReturnValueResponse") return undefined;
+          return rpcService.request(msg, {
+            sessionId: `joplin:${String(handle?.id ?? handle)}`,
+            handleId: String(handle?.id ?? handle),
+            selectedNoteId: currentNoteId || undefined,
+            signal: editorHandle.signal,
+          });
         });
 
-        // Push setting changes to the webview
-        await (joplin.settings as any).onChange(async (event: any) => {
-          if (event.keys.includes("asciidoc.compactSpacing")) {
-            const value = await joplin.settings.value("asciidoc.compactSpacing");
-            editors.postMessage(handle, {
-              type: "updateCompactSpacing",
-              value: value === true,
-            });
-          }
-          if (event.keys.includes("asciidoc.attributeAutocomplete")) {
-            editors.postMessage(handle, {
-              type: "updateAttributeAutocomplete",
-              enabled: await joplin.settings.value("asciidoc.attributeAutocomplete") !== false,
-            });
-          }
-          if (event.keys.includes("asciidoc.spellCheck")) {
-            const nspellSpellcheckEnabled = await joplin.settings.value("asciidoc.spellCheck") !== false;
-            editors.postMessage(handle, {
-              type: "updateSpellCheck",
-              enabled: nspellSpellcheckEnabled,
-              mode: nspellSpellcheckEnabled ? "nspell" : "native",
-            });
-          }
-          if (event.keys.includes("asciidoc.editorTheme") || event.keys.includes("asciidoc.mermaidThemeVariables")) {
-            editors.postMessage(handle, {
-              type: "updateEditorTheme",
-              editorTheme: await joplin.settings.value("asciidoc.editorTheme"),
-              mermaidThemeVariables: await joplin.settings.value("asciidoc.mermaidThemeVariables"),
-              isDark: await joplin.shouldUseDarkColors(),
-            });
-          }
-        });
+      },
+
+      async onDestroy(handle: any) {
+        editorHandles.dispose(handle);
       },
 
       async onActivationCheck(event: any) {
@@ -2071,6 +1434,33 @@ joplin.plugins.register({
         return isAsciiDocNote(note?.body ?? "");
       },
     } as any);
+    // Register one setting observer and fan out to the currently live handles.
+    await (joplin.settings as any).onChange(async (event: any) => {
+      if (event.keys.includes("asciidoc.compactSpacing")) {
+        editorHandles.postAll({
+          type: "updateCompactSpacing",
+          value: await joplin.settings.value("asciidoc.compactSpacing") === true,
+        });
+      }
+      if (event.keys.includes("asciidoc.attributeAutocomplete")) {
+        editorHandles.postAll({
+          type: "updateAttributeAutocomplete",
+          enabled: await joplin.settings.value("asciidoc.attributeAutocomplete") !== false,
+        });
+      }
+      if (event.keys.includes("asciidoc.spellCheck")) {
+        const enabled = await joplin.settings.value("asciidoc.spellCheck") !== false;
+        editorHandles.postAll({ type: "updateSpellCheck", enabled, mode: enabled ? "nspell" : "native" });
+      }
+      if (event.keys.includes("asciidoc.editorTheme") || event.keys.includes("asciidoc.mermaidThemeVariables")) {
+        editorHandles.postAll({
+          type: "updateEditorTheme",
+          editorTheme: await joplin.settings.value("asciidoc.editorTheme"),
+          mermaidThemeVariables: await joplin.settings.value("asciidoc.mermaidThemeVariables"),
+          isDark: await joplin.shouldUseDarkColors(),
+        });
+      }
+    });
     } catch (e) {
       console.error("[adocLIVE] Failed to register custom editor:", e);
     }

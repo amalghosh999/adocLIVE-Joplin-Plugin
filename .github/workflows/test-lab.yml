@@ -1,0 +1,114 @@
+name: Test Lab
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+    tags: ["v*"]
+  workflow_dispatch:
+  schedule:
+    - cron: "23 5 * * *"
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+  TZ: America/Chicago
+
+jobs:
+  unit-build-contracts:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:prod:pr
+      - if: startsWith(github.ref, 'refs/tags/v')
+        run: npm run audit:prod:release
+      - run: npm run test:unit
+      - run: npm run typecheck
+      - run: npm run typecheck:lab
+      - run: npm run dist
+      - name: Record bundle and JPL sizes
+        run: wc -c dist/index.js dist/panel.js publish/com.asciidoc.joplin-plugin.jpl
+
+  browser-protected:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:prod:pr
+      - run: npm run test:browser
+      - run: npm run test:scroll
+      - run: npm run test:visual
+      - run: npm run test:a11y
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-evidence
+          path: |
+            test-results
+            playwright-report
+          retention-days: 14
+
+  joplin-sim-artifact:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:prod:pr
+      - if: startsWith(github.ref, 'refs/tags/v')
+        run: npm run audit:prod:release
+      - run: npm run test:joplin-sim
+      - run: npm run test:artifact-smoke
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-smoke-evidence
+          path: |
+            test-results
+            playwright-report
+          retention-days: 14
+
+  nightly-performance-leaks:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:prod:nightly
+      - run: npm run test:fixtures
+      - run: npm run test:perf
+      - run: npm run test:leak
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-test-lab-metrics
+          path: |
+            test-results
+            playwright-report
+            .baseline-candidates/audit-nightly.json
+          retention-days: 30

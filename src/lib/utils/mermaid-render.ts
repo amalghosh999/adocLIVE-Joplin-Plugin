@@ -1,6 +1,7 @@
 import mermaid from "mermaid";
 import elkLayouts from "@mermaid-js/layout-elk";
 import type { ThemeMermaidConfig } from "../../shared/theme-types";
+import { emitEditorDiagnostic } from "../../shared/editor-diagnostics";
 
 // ── Module state ──
 
@@ -37,6 +38,7 @@ export function renderMermaidAsync(source: string, onComplete: () => void): void
 
   const gen = currentGeneration;
   const id = `mermaid-render-${++renderCounter}`;
+  emitEditorDiagnostic("mermaid", "render", "start", { generation: gen, sourceLength: source.length });
   const promise = (async () => {
     ensureInitialized();
     try {
@@ -44,6 +46,7 @@ export function renderMermaidAsync(source: string, onComplete: () => void): void
       // Only cache if generation hasn't changed during render
       if (gen === currentGeneration) {
         svgCache.set(source, { svg, generation: gen });
+        emitEditorDiagnostic("mermaid", "render", "end", { generation: gen, cacheSize: svgCache.size });
       }
     } catch (e: any) {
       const msg = (e.message || String(e)).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -51,6 +54,7 @@ export function renderMermaidAsync(source: string, onComplete: () => void): void
       if (gen === currentGeneration) {
         svgCache.set(source, { svg: errorSvg, generation: gen });
       }
+      emitEditorDiagnostic("mermaid", "render", "error", { generation: gen, message: msg.substring(0, 200) });
     } finally {
       pendingRenders.delete(source);
       // Clean up any leftover Mermaid containers from failed renders
@@ -76,6 +80,7 @@ export function setMermaidThemeConfig(config: ThemeMermaidConfig): void {
   currentThemeConfig = nextConfig;
   currentGeneration++;
   svgCache.clear();
+  emitEditorDiagnostic("mermaid", "theme-generation", "snapshot", { generation: currentGeneration, cacheSize: 0 });
   if (initialized) {
     initMermaidConfig();
   }

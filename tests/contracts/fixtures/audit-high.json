@@ -1,0 +1,25 @@
+{
+  "vulnerabilities": {
+    "transitive-package": {
+      "name": "transitive-package",
+      "severity": "high",
+      "via": [
+        {
+          "source": 1234567,
+          "url": "https://github.com/advisories/GHSA-aaaa-bbbb-cccc",
+          "severity": "high"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 1,
+      "critical": 0,
+      "total": 1
+    }
+  }
+}

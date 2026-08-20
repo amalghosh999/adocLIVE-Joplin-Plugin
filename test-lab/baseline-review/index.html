@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>adocLIVE Test Lab · Baseline review</title>
+    <link rel="stylesheet" href="/baseline-review/review.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>adocLIVE Test Lab</h1>
+        <p>Real panel bundle · deterministic simulated Joplin</p>
+      </div>
+      <div class="badges">
+        <nav class="topnav" aria-label="Test Lab pages"><a href="/">Dashboard</a><strong aria-current="page">Baseline review</strong></nav>
+        <span id="canonical-badge" class="badge neutral">No bundle</span>
+        <span id="audit-badge">Audit —</span>
+        <span>Unresolved <output id="top-unresolved">14</output></span>
+      </div>
+    </header>
+
+    <div id="page-error" class="fatal" role="alert" hidden></div>
+    <main class="review-grid" aria-label="Baseline review workspace">
+      <aside class="queue-pane pane" aria-labelledby="queue-heading">
+        <section class="pane-header">
+          <h2 id="queue-heading">Baseline review queue</h2>
+          <p>Digest-bound evidence · browser review is repository read-only</p>
+        </section>
+
+        <section class="bundle-panel section-block" aria-labelledby="bundle-heading">
+          <h3 id="bundle-heading">Immutable bundle</h3>
+          <label>Candidate run
+            <select id="bundle-select" aria-describedby="bundle-digest"><option value="">Loading candidates…</option></select>
+          </label>
+          <dl class="provenance compact">
+            <div><dt>Digest</dt><dd id="bundle-digest">—</dd></div>
+            <div><dt>Source</dt><dd id="source-commit">—</dd></div>
+            <div><dt>Environment</dt><dd id="environment-summary">—</dd></div>
+          </dl>
+          <div id="draft-reasons" class="notice" hidden></div>
+        </section>
+
+        <section class="queue-tools section-block" aria-label="Queue controls">
+          <label>Search evidence <input id="queue-search" type="search" autocomplete="off" placeholder="Exact item or scenario"></label>
+          <div class="segmented" role="group" aria-label="Status filter">
+            <button type="button" data-status-filter="all" aria-pressed="true">All</button>
+            <button type="button" data-status-filter="unresolved" aria-pressed="false">Unresolved</button>
+            <button type="button" data-status-filter="approved" aria-pressed="false">Approved</button>
+          </div>
+          <div class="progress-line"><strong>Progress</strong><output id="progress-output">0 of 14 approved</output></div>
+          <progress id="progress" max="14" value="0">0 of 14</progress>
+        </section>
+
+        <nav class="queue-nav" aria-label="Individual evidence items">
+          <ol id="queue-list"></ol>
+        </nav>
+        <p class="keyboard-help"><kbd>J</kbd>/<kbd>K</kbd> next/previous · <kbd>U</kbd> next unresolved</p>
+      </aside>
+
+      <section class="viewer-pane pane" aria-labelledby="item-heading">
+        <header class="item-header">
+          <div><p id="item-kind" class="eyebrow">Visual evidence</p><h2 id="item-heading">Select a candidate bundle</h2></div>
+          <div id="item-hashes" class="hashes">—</div>
+        </header>
+
+        <div id="visual-viewer" class="viewer-content" hidden>
+          <div class="viewer-toolbar" aria-label="Comparison controls">
+            <div class="segmented" role="group" aria-label="Comparison mode">
+              <button type="button" data-view-mode="before" aria-pressed="false">Before</button>
+              <button type="button" data-view-mode="candidate" aria-pressed="false">Candidate</button>
+              <button type="button" data-view-mode="diff" aria-pressed="false">Diff</button>
+              <button type="button" data-view-mode="overlay" aria-pressed="false">Overlay</button>
+              <button type="button" data-view-mode="split" aria-pressed="true">Sync split</button>
+            </div>
+            <div class="zoom-tools">
+              <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+              <output id="zoom-output">100%</output>
+              <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+              <button id="zoom-fit" type="button">Fit</button>
+              <button id="zoom-reset" type="button">Reset</button>
+              <label>Overlay <input id="overlay-opacity" type="range" min="0" max="100" value="50" disabled></label>
+            </div>
+          </div>
+          <div id="comparison-viewport" class="comparison-viewport" tabindex="0" aria-label="Synchronized image comparison viewport">
+            <div id="image-stage" class="image-stage" data-mode="split">
+              <img id="before-image" alt="Approved before baseline">
+              <img id="candidate-image" alt="Generated candidate">
+              <img id="diff-image" alt="Deterministic pixel diff">
+              <span id="split-divider" class="split-divider" aria-hidden="true"></span>
+            </div>
+          </div>
+          <section class="metrics-section" aria-labelledby="metrics-heading"><h3 id="metrics-heading">Deterministic pixel metrics</h3><dl id="visual-metrics" class="metrics-grid"></dl></section>
+          <section class="thumbnail-strip" aria-label="Evidence thumbnails">
+            <figure><img id="before-thumb" alt="Before thumbnail"><figcaption>Before</figcaption></figure>
+            <figure><img id="candidate-thumb" alt="Candidate thumbnail"><figcaption>Candidate</figcaption></figure>
+            <figure><img id="diff-thumb" alt="Diff thumbnail"><figcaption>Diff</figcaption></figure>
+          </section>
+        </div>
+
+        <div id="scroll-viewer" class="viewer-content" hidden>
+          <div class="known-warning"><strong>Characterization, not correctness.</strong> The regression ceiling protects current behavior only. ADL-022 quarter-line safety and ADL-023 bottom-clamp behavior remain desired-behavior expected failures.</div>
+          <section class="metrics-section"><h3>Geometry and distribution</h3><dl id="scroll-metrics" class="metrics-grid"></dl></section>
+          <div class="chart-grid">
+            <figure><figcaption>Run order · all 30 displacement values</figcaption><svg id="run-order-chart" role="img" aria-label="Scroll displacement by run"></svg></figure>
+            <figure><figcaption>Distribution</figcaption><svg id="distribution-chart" role="img" aria-label="Scroll displacement histogram"></svg></figure>
+          </div>
+          <section><h3>All values</h3><div class="value-table-wrap"><table><thead><tr><th>Run</th><th>Displacement (px)</th></tr></thead><tbody id="scroll-values"></tbody></table></div></section>
+          <section><h3>Median and worst key frames</h3><div id="scroll-frames" class="frame-grid"></div></section>
+        </div>
+
+        <div id="empty-viewer" class="empty-state">No validated candidate bundle is available. Generate or import one, then reload this page.</div>
+      </section>
+
+      <aside class="decision-pane pane" aria-labelledby="decision-heading">
+        <section class="pane-header sticky-decision"><p class="eyebrow">Selected item</p><h2 id="decision-heading">Decision</h2><p id="decision-status">Unresolved</p></section>
+        <form id="review-form" novalidate>
+          <fieldset class="decision-controls">
+            <legend>Evidence decision</legend>
+            <div class="decision-buttons">
+              <button id="approve" type="button" data-decision="approved">✓ Approve</button>
+              <button id="reject" type="button" data-decision="rejected">✕ Reject</button>
+              <button id="regenerate" type="button" data-decision="regenerate">↻ Regenerate</button>
+            </div>
+            <label>Item note <span class="optional">optional for approval; required otherwise</span>
+              <textarea id="item-note" rows="4" aria-describedby="note-help"></textarea>
+            </label>
+            <p id="note-help" class="field-help">Notes autosave locally for this exact bundle digest.</p>
+          </fieldset>
+
+          <details open>
+            <summary>Known-issue acknowledgement</summary>
+            <div class="details-body">
+              <p>Approval does not accept either defect as correct.</p>
+              <label class="checkbox"><input id="ack-adl-022" type="checkbox"> I acknowledge ADL-022 remains an expected-failing quarter-line safety contract.</label>
+              <label class="checkbox"><input id="ack-adl-023" type="checkbox"> I acknowledge ADL-023 remains an expected-failing bottom-clamp contract.</label>
+            </div>
+          </details>
+
+          <details>
+            <summary>Immutable provenance</summary>
+            <div class="details-body"><dl id="artifact-provenance" class="provenance"></dl></div>
+          </details>
+
+          <details open>
+            <summary>Windows hardened-JPL evidence</summary>
+            <div class="details-body native-evidence" data-platform="windows">
+              <label>Joplin version <input name="joplinVersion" autocomplete="off" aria-describedby="windows-error"></label>
+              <label>Windows version <input name="osVersion" autocomplete="off" aria-describedby="windows-error"></label>
+              <label>Date <input name="date" type="date" aria-describedby="windows-error"></label>
+              <label>Verifier <input name="verifier" autocomplete="name" aria-describedby="windows-error"></label>
+              <label>Result <select name="result" aria-describedby="windows-error"><option value="">Select…</option><option value="pass">Pass</option><option value="fail">Fail</option></select></label>
+              <label>Deviations <textarea name="deviations" rows="2" placeholder="Use ‘None’ when there were no deviations" aria-describedby="windows-error"></textarea></label>
+              <fieldset class="delta-cases"><legend>Exact hardened-JPL delta cases</legend>
+                <label class="checkbox"><input type="checkbox" name="installStartup" aria-describedby="windows-error"> Install and startup</label>
+                <label class="checkbox"><input type="checkbox" name="representativeRender" aria-describedby="windows-error"> Representative render</label>
+                <label class="checkbox"><input type="checkbox" name="themeAndViewChanges" aria-describedby="windows-error"> Theme and view changes</label>
+                <label class="checkbox"><input type="checkbox" name="hostileFixture" aria-describedby="windows-error"> Hostile fixture</label>
+                <label class="checkbox"><input type="checkbox" name="upgrade" aria-describedby="windows-error"> Upgrade from prior release</label>
+              </fieldset>
+              <p id="windows-error" class="platform-error" role="status"></p>
+            </div>
+          </details>
+
+          <details open>
+            <summary>macOS hardened-JPL evidence</summary>
+            <div class="details-body native-evidence" data-platform="macos">
+              <label>Joplin version <input name="joplinVersion" autocomplete="off" aria-describedby="macos-error"></label>
+              <label>macOS version <input name="osVersion" autocomplete="off" aria-describedby="macos-error"></label>
+              <label>Date <input name="date" type="date" aria-describedby="macos-error"></label>
+              <label>Verifier <input name="verifier" autocomplete="name" aria-describedby="macos-error"></label>
+              <label>Result <select name="result" aria-describedby="macos-error"><option value="">Select…</option><option value="pass">Pass</option><option value="fail">Fail</option></select></label>
+              <label>Deviations <textarea name="deviations" rows="2" placeholder="Use ‘None’ when there were no deviations" aria-describedby="macos-error"></textarea></label>
+              <fieldset class="delta-cases"><legend>Exact hardened-JPL delta cases</legend>
+                <label class="checkbox"><input type="checkbox" name="installStartup" aria-describedby="macos-error"> Install and startup</label>
+                <label class="checkbox"><input type="checkbox" name="representativeRender" aria-describedby="macos-error"> Representative render</label>
+                <label class="checkbox"><input type="checkbox" name="themeAndViewChanges" aria-describedby="macos-error"> Theme and view changes</label>
+                <label class="checkbox"><input type="checkbox" name="hostileFixture" aria-describedby="macos-error"> Hostile fixture</label>
+                <label class="checkbox"><input type="checkbox" name="upgrade" aria-describedby="macos-error"> Upgrade from prior release</label>
+              </fieldset>
+              <p id="macos-error" class="platform-error" role="status"></p>
+            </div>
+          </details>
+
+          <section class="finalize-section" aria-labelledby="finalize-heading">
+            <h3 id="finalize-heading">Finalize receipt</h3>
+            <label>Named reviewer <input id="reviewer" autocomplete="name"></label>
+            <label>Overall rationale <textarea id="overall-rationale" rows="4" required></textarea></label>
+            <div class="draft-actions">
+              <label class="file-button">Import draft JSON <input id="import-draft" type="file" accept="application/json,.json"></label>
+              <button id="export-draft" type="button">Export draft JSON</button>
+            </div>
+            <ul id="finalization-blockers" class="blocker-list"></ul>
+            <button id="finalize" class="primary" type="button" disabled>Finalize &amp; download receipt</button>
+            <p id="autosave-status" class="field-help" role="status">No draft loaded.</p>
+          </section>
+        </form>
+      </aside>
+    </main>
+    <script src="/baseline-review/review.js"></script>
+  </body>
+</html>

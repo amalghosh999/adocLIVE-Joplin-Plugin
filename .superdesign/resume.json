@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/": {
+      "targetKind": "existing-ui",
+      "projectId": "edbe6f92-5b63-4a0c-8c17-1f0d7027e9fc",
+      "baselineDraftId": "1c3f6504-fd70-4397-a327-2aa456a392bb",
+      "activeDraftId": "1c3f6504-fd70-4397-a327-2aa456a392bb",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "1be73704-2367-43fb-9089-1ef2c672ba41"
+      ],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "test-lab/controller/index.html",
+        "test-lab/controller/controller.css",
+        "test-lab/controller/index.ts"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "171f1cc204f91d1998990f96e40aec685034813ffeb675d510107ff6f71edf51",
+        "test-lab/controller/index.html": "786cd25da8762b5d57f80c327c171a16c5aa48e1b4a3c1c46d3e3ace5efebd5b",
+        "test-lab/controller/controller.css": "7dd73b9ed8df31e4f2ed844de20ff4c4d763d4ad59704c29693c4433fcc83071",
+        "test-lab/controller/index.ts": "878c37e979a03bbdaf271ba30408b5d4259630a000a1bd32e517877589b835a8"
+      },
+      "components": [
+        {
+          "name": "TestLabTopbar",
+          "id": "bb44ff52-111d-4b57-8b42-ba0b78fd63ba",
+          "sourcePath": "test-lab/controller/index.html"
+        },
+        {
+          "name": "ThreePaneWorkspace",
+          "id": "e7688b77-ad37-4e15-ad61-e8ffc2823b3a",
+          "sourcePath": "test-lab/controller/index.html"
+        }
+      ],
+      "drafts": {
+        "1c3f6504-fd70-4397-a327-2aa456a392bb": {
+          "title": "adocLIVE Test Lab Dashboard",
+          "visualDirection": "faithful current dashboard reproduction",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-08-20T20:56:40Z"
+    },
+    "/baseline-review/": {
+      "targetKind": "new-ui",
+      "projectId": "edbe6f92-5b63-4a0c-8c17-1f0d7027e9fc",
+      "activeDraftId": "da327fed-dbf6-4ed6-90a6-1c23b0e3ea28",
+      "sourceTarget": "/",
+      "sourceDraftId": "1c3f6504-fd70-4397-a327-2aa456a392bb",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "1be73704-2367-43fb-9089-1ef2c672ba41",
+        "95aecd03-8d02-4740-9cfd-fb894e27d8d6"
+      ],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "test-lab/controller/index.html",
+        "test-lab/controller/controller.css",
+        "docs/test-lab/BASELINES.md",
+        "docs/test-lab/KNOWN_FAILURES.md",
+        "tests/browser/baselines/visual/baseline.json",
+        "tests/browser/baselines/scroll/scroll-bounds.json",
+        "docs/test-lab/evidence/NATIVE_JOPLIN_MATRIX.md",
+        "docs/test-lab/evidence/BASELINE_APPROVAL.md"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "171f1cc204f91d1998990f96e40aec685034813ffeb675d510107ff6f71edf51",
+        "test-lab/controller/index.html": "786cd25da8762b5d57f80c327c171a16c5aa48e1b4a3c1c46d3e3ace5efebd5b",
+        "test-lab/controller/controller.css": "7dd73b9ed8df31e4f2ed844de20ff4c4d763d4ad59704c29693c4433fcc83071",
+        "docs/test-lab/BASELINES.md": "8f93c7589945a04fb76e8128427840d48c857909acf889e8082c933f59c19c0b",
+        "docs/test-lab/KNOWN_FAILURES.md": "9887d48332b9a41cf21322e92cb6cf89c4fdc9da73652b8a81ad12d8442ef1ca",
+        "tests/browser/baselines/visual/baseline.json": "32deb80826f66ccaba1529ab4ea3ec2a12c5b6ac3d394a3545a8198b4fd27eb7",
+        "tests/browser/baselines/scroll/scroll-bounds.json": "daa12d09cb7fb37492d906fd587d6b7914f67a129ccf0f4befe66e33f03593c7",
+        "docs/test-lab/evidence/NATIVE_JOPLIN_MATRIX.md": "5c0502886984ce981b1e0ff4e3750f02f7045928a76b72ec75ca87467e203283",
+        "docs/test-lab/evidence/BASELINE_APPROVAL.md": "42efd501350c563465360a950da0d4a6394e7e0a19bc6bff450e4c7aca1e9847"
+      },
+      "components": [
+        {
+          "name": "TestLabTopbar",
+          "id": "bb44ff52-111d-4b57-8b42-ba0b78fd63ba",
+          "sourcePath": "test-lab/controller/index.html"
+        }
+      ],
+      "drafts": {
+        "da327fed-dbf6-4ed6-90a6-1c23b0e3ea28": {
+          "title": "adocLIVE Baseline Review — Populated Three-Pane Interface",
+          "visualDirection": "compact evidence-first three-pane review queue",
+          "parentDraftId": "1c3f6504-fd70-4397-a327-2aa456a392bb",
+          "currentVersion": 4
+        }
+      },
+      "updatedAt": "2026-08-20T20:56:40Z"
+    }
+  }
+}

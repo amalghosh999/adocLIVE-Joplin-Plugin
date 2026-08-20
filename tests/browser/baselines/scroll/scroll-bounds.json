@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "browser": "chromium",
+  "platform": "linux",
+  "container": "mcr.microsoft.com/playwright:v1.61.1-noble",
+  "approved": false,
+  "approvalEvidence": null,
+  "characterizedOn": "2026-07-10",
+  "scenarios": {
+    "raw-live-raw-mid-document": {
+      "runs": 30,
+      "valuesPx": [18.3125, 0.25, 653.6875, 689.3125, 363.0625, 520.3125, 383.25, 278.125, 88.3125, 51.9375, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625, 54.5625],
+      "medianPx": 54.5625,
+      "p99Px": 689.3125,
+      "madPx": 0,
+      "rawLineHeightPx": 18.1875,
+      "roundingMarginPx": 1,
+      "maxDisplacementPx": 690.3125,
+      "quarterLineSafetyPx": 4.546875,
+      "knownIssue": "ADL-022"
+    }
+  }
+}

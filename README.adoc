@@ -743,39 +743,52 @@ npm run typecheck  # TypeScript check
 npm pack --dry-run # Confirm npm package contents
 ----
 
+=== Contributor Test Lab
+
+The Test Lab boots the real panel bundle in pinned Chromium against a deterministic simulated Joplin host. It includes multi-session races, fault controls, replay, scroll/visual/accessibility protection, performance/leak checks, and extracted-JPL smoke coverage.
+
+[source,bash]
+----
+npm run playwright:install
+npm run lab             # Dashboard on http://127.0.0.1:4173
+npm run test:lab:pr     # Required automated contributor gate
+npm run test:lab:nightly
+npm run baseline:review # Review immutable visual/scroll candidates locally
+----
+
+See link:docs/test-lab/README.md[Test Lab contributor guide]. Baseline approval and the native Joplin matrix remain explicit human evidence gates.
+
 After every build, restart Joplin to load the updated plugin.
 
 '''
 
 == Publishing
 
-To publish to the Joplin plugin directory:
+Release preparation and publication are intentionally separate. Direct
+`+npm publish+` and the legacy bump/build/publish script are disabled so a
+reviewed artifact cannot be rebuilt during publication.
 
 [source,bash]
 ----
-npm publish        # Builds, packages .jpl into publish/, and publishes to npm
+npm run release:prepare  # clean source commit -> canonical immutable bundle
+npm run baseline:review  # review 13 visuals, scroll, and native-platform evidence
+npm run baseline:apply -- <receipt.json>
+
+# After the separate evidence-only commit, validate without publishing:
+npm run release:publish -- \
+  --bundle .baseline-candidates/<digest> \
+  --receipt docs/test-lab/evidence/baseline-reviews/<digest>.receipt.json \
+  --confirm 1.0.4 \
+  --dry-run
 ----
 
-The Joplin plugin directory automatically discovers packages on npm with the `joplin-plugin` keyword.
-
-For the scripted release flow:
-
-[source,bash]
-----
-npm run release        # patch release
-npm run release:minor  # minor release
-npm run release:major  # major release
-----
-
-The release script requires a clean `master` branch, updates `package.json` and `src/manifest.json`, runs unit tests and typecheck, builds `publish/com.asciidoc.joplin-plugin.jpl`, commits, tags, pushes, creates a GitHub release, and publishes to npm.
-
-To create a GitHub release for manual installation:
-
-[source,bash]
-----
-npm run build
-gh release create v1.0.3 ./publish/com.asciidoc.joplin-plugin.jpl --title "v1.0.3" --notes "Release v1.0.3"
-----
+The user creates the clean source commit and the subsequent evidence-only
+commit. Removing `+--dry-run+` is a separate explicit publication action: the
+command verifies the receipt, live production audit, commit allowlist,
+authentication, tags, and exact stored JPL/npm-tarball hashes before pushing or
+publishing. See link:docs/test-lab/RELEASE_HANDOFF.md[the 1.0.4 release handoff].
+The Joplin plugin directory discovers npm packages carrying the
+`+joplin-plugin+` keyword.
 
 '''
 

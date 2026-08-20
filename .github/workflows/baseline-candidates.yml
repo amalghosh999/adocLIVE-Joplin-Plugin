@@ -1,0 +1,40 @@
+name: Canonical baseline candidates
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+  TZ: America/Chicago
+  ADOC_CANONICAL_CONTAINER: mcr.microsoft.com/playwright:v1.61.1-noble
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:prod:release
+      - run: npm run baseline:candidates -- --canonical
+      - name: Validate and archive immutable candidate bundle
+        run: |
+          bundle_dir="$(find .baseline-candidates -mindepth 1 -maxdepth 1 -type d -name '[a-f0-9]*' | head -n 1)"
+          test -n "$bundle_dir"
+          node --input-type=module -e "import { validateBundleDirectory } from './baseline/node-utils.ts'; validateBundleDirectory(process.argv[1], true)" "$bundle_dir"
+          tar --sort=name --owner=0 --group=0 --numeric-owner -cf baseline-candidate.tar -C .baseline-candidates "$(basename "$bundle_dir")"
+          gzip -n -9 baseline-candidate.tar
+          mv baseline-candidate.tar.gz baseline-candidate.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adoclive-baseline-candidate-${{ github.sha }}
+          path: baseline-candidate.tgz
+          if-no-files-found: error
+          retention-days: 30

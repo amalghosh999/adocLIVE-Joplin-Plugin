@@ -20,11 +20,13 @@ import {
   parseAsciiDocBlockAttributeLine,
   parseAsciiDocRoleOnlyAttribute,
 } from "../../shared/asciidoc-attributes";
+import { emitEditorDiagnostic } from "../../shared/editor-diagnostics";
 
 // Joplin resource URL cache for resolving :/resourceId patterns
 const resourceUrlCache = new Map<string, string>();
 export function updateResourceUrls(resources: Array<{ id: string; dataUrl: string }>) {
   for (const r of resources) resourceUrlCache.set(r.id, r.dataUrl);
+  emitEditorDiagnostic("resource", "cache-update", "snapshot", { added: resources.length, size: resourceUrlCache.size });
 }
 
 // =====================================================
@@ -851,6 +853,7 @@ function closeBlockEditorModal(view?: EditorView) {
   if (blockEditorOverlay) {
     blockEditorOverlay.remove();
     blockEditorOverlay = null;
+    emitEditorDiagnostic("overlay", "block-editor", "end");
   }
   if (view) {
     view.focus();
@@ -930,6 +933,7 @@ function createBlockEditorModal(view: EditorView, title: string) {
     || view.dom.closest(".dark-theme") != null;
   if (isDark) overlay.style.colorScheme = "dark";
   blockEditorOverlay = overlay;
+  emitEditorDiagnostic("overlay", "block-editor", "start", { title });
 
   return { overlay, modal, body, footer, footerLeft, footerRight, close };
 }
@@ -2687,6 +2691,7 @@ function openImageEditorModal(view: EditorView, info: ImageBlockInfo) {
 }
 
 function schedulePreviewHeightMeasurement(view: EditorView, cache: PreviewHeightCache) {
+  emitEditorDiagnostic("measurement", "preview-height", "start");
   view.requestMeasure({
     read(view) {
       const lineHeights = new Map<number, number>();
@@ -2708,6 +2713,7 @@ function schedulePreviewHeightMeasurement(view: EditorView, cache: PreviewHeight
       for (const [from, height] of measured.lineHeights) {
         cache.lineHeights.set(from, height);
       }
+      emitEditorDiagnostic("measurement", "preview-height", "end", { lines: measured.lineHeights.size });
     },
   });
 }
@@ -9492,6 +9498,7 @@ const livePreviewViewPlugin = ViewPlugin.fromClass(
 
     scheduleHeightMeasurement(view: EditorView, options: { preserveScroll?: boolean } = {}) {
       const preserveScroll = options.preserveScroll !== false;
+      emitEditorDiagnostic("measurement", "live-preview-height", "start", { preserveScroll });
       view.requestMeasure({
         read(view) {
           const lineHeights = new Map<number, number>();
@@ -9519,6 +9526,10 @@ const livePreviewViewPlugin = ViewPlugin.fromClass(
           return { lineHeights, rawLineHeights };
         },
         write(measured, view) {
+          emitEditorDiagnostic("measurement", "live-preview-height", "end", {
+            renderedLines: measured.lineHeights.size,
+            rawLines: measured.rawLineHeights.size,
+          });
           const currentState = view.state.field(livePreviewDecorationField);
           const rawBaseHeight = measureRawLineHeightPx(view);
           let changed = Math.abs(currentState.rawBaseHeight - rawBaseHeight) > 0.5;
