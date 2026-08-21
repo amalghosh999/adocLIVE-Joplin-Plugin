@@ -43,6 +43,8 @@
     "lab:serve": "node scripts/lab-server.js",
     "lab:serve:dist": "node scripts/lab-server.js --dist",
     "lab:serve:artifact": "node scripts/lab-server.js --artifact",
+    "docs:screenshots": "npm run dist && npm run lab:build && node scripts/capture-docs-screenshots.js",
+    "test:docs": "vitest run tests/unit/documentation.test.ts",
     "playwright:install": "playwright install chromium",
     "test:browser": "playwright test --grep-invert '@perf|@leak|@artifact|@scroll|@visual|@a11y|@fixture-matrix'",
     "test:browser:headed": "playwright test --headed --workers=1 --grep-invert '@perf|@leak|@artifact|@fixture-matrix'",

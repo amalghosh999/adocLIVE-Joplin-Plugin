@@ -2,7 +2,7 @@ src/
 dist/
 *.jpl
 *.md
-!README.adoc
+!README.md
 tsconfig.json
 webpack.config.js
 .DS_Store

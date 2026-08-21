@@ -59,7 +59,7 @@ describe("generated JPL and npm payload", () => {
     const result = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json"], { cwd: root, encoding: "utf8" }));
     const details = Array.isArray(result) ? result[0] : Object.values(result)[0] as { files: Array<{ path: string }> };
     const files = details.files.map((entry: { path: string }) => entry.path);
-    const allowedMetadata = new Set(["package.json", "README.adoc", "LICENSE"]);
+    const allowedMetadata = new Set(["package.json", "README.md", "LICENSE"]);
     expect(files.every((entry: string) => allowedMetadata.has(entry) || entry.startsWith("publish/"))).toBe(true);
     expect(files.some((entry: string) => entry.endsWith(".jpl"))).toBe(true);
   });

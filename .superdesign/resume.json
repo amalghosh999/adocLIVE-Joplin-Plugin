@@ -92,6 +92,35 @@
         }
       },
       "updatedAt": "2026-08-20T20:56:40Z"
+    },
+    "docs:readme": {
+      "targetKind": "new-ui",
+      "projectId": "425b67d5-8490-48f6-b5b6-f98d816d7fbf",
+      "activeDraftId": "7f38aa44-5841-4938-80fc-b00363bd30d6",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "7edfa751-beff-4180-980b-a7ae930652cd",
+        "92fe1550-be63-4ba8-9e68-3c0ee4b2b223",
+        "8bd96dab-a0b2-4323-abb8-de4163c9cda0",
+        "9412edb5-4f3b-4486-8584-172038fa4bb2"
+      ],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "README.adoc"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "171f1cc204f91d1998990f96e40aec685034813ffeb675d510107ff6f71edf51",
+        "README.adoc": "740d591593685154a3dfefe8d630afd61404a1726896c234523d3fa68faf3904"
+      },
+      "components": [],
+      "drafts": {
+        "7f38aa44-5841-4938-80fc-b00363bd30d6": {
+          "title": "adocLIVE README and Joplin Plugin Page",
+          "visualDirection": "actual Joplin plugin listing shell with a conservative single-column Markdown README",
+          "currentVersion": 3
+        }
+      },
+      "updatedAt": "2026-08-21T18:25:03Z"
     }
   }
 }

@@ -142,14 +142,18 @@ export function verifyReleaseMetadata(bundleRoot: string, bundle: BaselineCandid
   }
 
   const npmTarballPath = resolveBundlePath(bundleRoot, bundle.artifacts.npmTarball.path);
+  const npmInventory = tarInventory(npmTarballPath).sort();
+  const readmeEntries = npmInventory.filter(entry => entry === "package/README.md" || entry === "package/README.adoc");
+  if (readmeEntries.length !== 1) {
+    throw new Error("Candidate npm tarball must contain exactly one supported README file");
+  }
   const expectedNpmFiles = [
     "package/LICENSE",
-    "package/README.adoc",
+    readmeEntries[0],
     "package/package.json",
     `package/publish/${pluginManifest.id}.jpl`,
     `package/publish/${pluginManifest.id}.json`,
   ].sort();
-  const npmInventory = tarInventory(npmTarballPath).sort();
   if (canonicalJson(npmInventory) !== canonicalJson(expectedNpmFiles)) {
     throw new Error(`Candidate npm tarball inventory does not match the release allowlist:\n${npmInventory.join("\n")}`);
   }

@@ -159,14 +159,14 @@ function createBundle(
   };
   write(npmRoot, "package/package.json", `${JSON.stringify(npmPackage, null, 2)}\n`);
   write(npmRoot, "package/LICENSE", "MIT\n");
-  write(npmRoot, "package/README.adoc", "= adocLIVE\n");
+  write(npmRoot, "package/README.md", "# adocLIVE\n");
   fs.mkdirSync(path.join(npmRoot, "package/publish"), { recursive: true });
   fs.copyFileSync(jplPath, path.join(npmRoot, "package/publish/com.asciidoc.joplin-plugin.jpl"));
   write(npmRoot, "package/publish/com.asciidoc.joplin-plugin.json", publishManifestText);
   const tarballPath = write(bundleWork, "artifacts/joplin-plugin-adoclive-1.0.4.tgz", "");
   run(buildRoot, "tar", [
     "-czf", tarballPath, "-C", npmRoot,
-    "package/LICENSE", "package/README.adoc", "package/package.json",
+    "package/LICENSE", "package/README.md", "package/package.json",
     "package/publish/com.asciidoc.joplin-plugin.jpl", "package/publish/com.asciidoc.joplin-plugin.json",
   ]);
   const npmTarball = artifactReference(bundleWork, "artifacts/joplin-plugin-adoclive-1.0.4.tgz");
@@ -301,7 +301,7 @@ describe("baseline receipt application", () => {
     fs.appendFileSync(path.join(extracted, "package/publish/com.asciidoc.joplin-plugin.jpl"), "tampered");
     run(workspace, "tar", [
       "-czf", tarball, "-C", extracted,
-      "package/LICENSE", "package/README.adoc", "package/package.json",
+      "package/LICENSE", "package/README.md", "package/package.json",
       "package/publish/com.asciidoc.joplin-plugin.jpl", "package/publish/com.asciidoc.joplin-plugin.json",
     ]);
     expect(() => verifyReleaseMetadata(bundleRoot, bundle)).toThrow(/exact reviewed JPL bytes/);

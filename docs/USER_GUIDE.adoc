@@ -1,4 +1,4 @@
-= adocLIVE -- Live Preview AsciiDoc Editor for Joplin
+= adocLIVE User and Contributor Guide
 
 A full-featured AsciiDoc editor plugin for https://joplinapp.org/[Joplin] with real-time live preview, rendered preview modes, a ribbon-style toolbar, and rich block editing. Write AsciiDoc notes with the same visual feedback you'd expect from a modern word processor -- rendered headings, media, tables, code blocks, diagrams, math, and more appear inline as you type.
 
@@ -646,7 +646,8 @@ The repository is organized around two runtime entry points: `+src/index.ts+` fo
 [source,text]
 ----
 joplin-asciidoc-plugin/
-├── README.adoc
+├── README.md
+├── docs/USER_GUIDE.adoc
 ├── package.json
 ├── package-lock.json
 ├── webpack.config.js
@@ -756,7 +757,7 @@ npm run test:lab:nightly
 npm run baseline:review # Review immutable visual/scroll candidates locally
 ----
 
-See link:docs/test-lab/README.md[Test Lab contributor guide]. Baseline approval and the native Joplin matrix remain explicit human evidence gates.
+See link:test-lab/README.md[Test Lab contributor guide]. Baseline approval and the native Joplin matrix remain explicit human evidence gates.
 
 After every build, restart Joplin to load the updated plugin.
 
@@ -786,7 +787,7 @@ The user creates the clean source commit and the subsequent evidence-only
 commit. Removing `+--dry-run+` is a separate explicit publication action: the
 command verifies the receipt, live production audit, commit allowlist,
 authentication, tags, and exact stored JPL/npm-tarball hashes before pushing or
-publishing. See link:docs/test-lab/RELEASE_HANDOFF.md[the 1.0.4 release handoff].
+publishing. See link:test-lab/RELEASE_HANDOFF.md[the 1.0.4 release handoff].
 The Joplin plugin directory discovers npm packages carrying the
 `+joplin-plugin+` keyword.
 
@@ -794,4 +795,4 @@ The Joplin plugin directory discovers npm packages carrying the
 
 == License
 
-MIT -- see link:LICENSE[LICENSE]
+MIT -- see link:../LICENSE[LICENSE]

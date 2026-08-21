@@ -10,5 +10,19 @@
   "repository_url": "https://github.com/amalghosh999/adocLIVE-Joplin-Plugin",
   "platforms": ["desktop"],
   "keywords": ["asciidoc", "editor", "preview", "live-preview"],
-  "categories": ["productivity", "editor"]
+  "categories": ["productivity", "editor"],
+  "screenshots": [
+    {
+      "src": "docs/images/adoclive-live-preview.png",
+      "label": "Live Preview with the original adocLIVE ribbon toolbar"
+    },
+    {
+      "src": "docs/images/adoclive-raw-text.png",
+      "label": "Raw AsciiDoc source with the View controls"
+    },
+    {
+      "src": "docs/images/adoclive-dark-theme.png",
+      "label": "Dark theme with the original Insert toolbar"
+    }
+  ]
 }

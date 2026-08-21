@@ -1,0 +1,49 @@
+= Small Project Release
+:toc:
+:toclevels: 2
+
+A reusable, fictional release note for showing tables, code, diagrams, and math in adocLIVE.
+
+== Ready for review
+
+* [x] Run the unit tests
+* [x] Check the packaged files
+* [ ] Ask a reviewer to try the build
+* [ ] Write the release summary
+
+[cols="1,1,2",options="header"]
+|===
+|Area |Status |Next step
+
+|Editor
+|Ready
+|Try the four view modes
+
+|Package
+|Ready
+|Install the local build
+
+|Notes
+|Draft
+|Summarize the visible changes
+|===
+
+== Build flow
+
+[mermaid]
+....
+flowchart LR
+  A[Write] --> B[Test]
+  B --> C[Review]
+  C --> D[Package]
+....
+
+== Smoke command
+
+[source,bash]
+----
+npm run test:unit
+npm run dist
+----
+
+If each check takes stem:[t] minutes and there are stem:[n] checks, the simple estimate is stem:[n times t] minutes.

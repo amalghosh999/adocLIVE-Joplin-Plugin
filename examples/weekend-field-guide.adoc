@@ -1,0 +1,43 @@
+= Weekend Field Guide
+:sectnums:
+
+A compact plan for a fictional day outdoors. Use this note as a starting point for checklists, schedules, and field observations.
+
+== Before you go
+
+* [x] Choose a short route
+* [x] Check the local forecast
+* [ ] Fill a water bottle
+* [ ] Pack a field notebook
+
+[NOTE]
+====
+The places, times, and conditions in this example are invented for the adocLIVE documentation.
+====
+
+== Route plan
+
+[cols="2,1,2",options="header",stripes=even]
+|===
+|Stop |Time |Plan
+
+|Trailhead
+|08:30
+|Review the map
+
+|Pine Loop
+|09:15
+|Record birds and wildflowers
+
+|Creek Overlook
+|11:00
+|Take a lunch break
+|===
+
+== Field notes
+
+Weather:: Clear with a light breeze
+Trail:: Dry and easy to follow
+Highlight:: A bright patch of *fictional sunflowers* beside the overlook
+
+TIP: Add a photo, map link, or Joplin resource when you copy this example into your own notebook.
