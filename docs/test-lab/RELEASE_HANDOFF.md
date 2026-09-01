@@ -1,4 +1,4 @@
-# 1.0.4 Release Handoff
+# 1.0.5 Release Handoff
 
 The release path preserves the package contract documented by the
 [official Joplin plugin generator](https://github.com/laurent22/joplin/blob/dev/packages/generator-joplin/generators/app/templates/GENERATOR_DOC.md):
@@ -8,7 +8,7 @@ continues to contain only those publish artifacts and required package metadata.
 
 ## Source and evidence commits
 
-1. Run the full verification matrix and create a clean 1.0.4 source commit.
+1. Run the full verification matrix and create a clean 1.0.5 source commit.
 2. Run `npm run release:prepare` or dispatch the canonical candidate workflow.
 3. Import the retained artifact if needed, then run `npm run baseline:review`.
 4. Review all 13 visuals and the scroll characterization; record exact Windows
@@ -29,7 +29,7 @@ Validate without publishing:
 npm run release:publish -- \
   --bundle .baseline-candidates/<digest> \
   --receipt docs/test-lab/evidence/baseline-reviews/<digest>.receipt.json \
-  --confirm 1.0.4 \
+  --confirm 1.0.5 \
   --dry-run
 ```
 

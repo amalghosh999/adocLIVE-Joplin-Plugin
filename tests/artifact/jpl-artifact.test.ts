@@ -40,6 +40,8 @@ describe("generated JPL and npm payload", () => {
     expect(packagedManifest.id).toBe(sourceManifest.id);
     expect(packagedManifest.version).toBe(sourceManifest.version);
     expect(packagedManifest.version).toBe(packageJson.version);
+    expect(packagedManifest.author).toBe(sourceManifest.author);
+    expect(packagedManifest.author).toBe("Amal Ghosh");
   });
 
   it("has no missing local CSS asset references", () => {

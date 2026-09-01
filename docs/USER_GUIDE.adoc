@@ -779,7 +779,7 @@ npm run baseline:apply -- <receipt.json>
 npm run release:publish -- \
   --bundle .baseline-candidates/<digest> \
   --receipt docs/test-lab/evidence/baseline-reviews/<digest>.receipt.json \
-  --confirm 1.0.4 \
+  --confirm 1.0.5 \
   --dry-run
 ----
 
@@ -787,7 +787,7 @@ The user creates the clean source commit and the subsequent evidence-only
 commit. Removing `+--dry-run+` is a separate explicit publication action: the
 command verifies the receipt, live production audit, commit allowlist,
 authentication, tags, and exact stored JPL/npm-tarball hashes before pushing or
-publishing. See link:test-lab/RELEASE_HANDOFF.md[the 1.0.4 release handoff].
+publishing. See link:test-lab/RELEASE_HANDOFF.md[the 1.0.5 release handoff].
 The Joplin plugin directory discovers npm packages carrying the
 `+joplin-plugin+` keyword.
 

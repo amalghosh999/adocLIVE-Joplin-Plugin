@@ -12,6 +12,13 @@ function pngDimensions(relativePath: string): { width: number; height: number } 
 }
 
 describe("public documentation", () => {
+  it("publishes the concise author name used by the Joplin directory", () => {
+    const packageJson = JSON.parse(read("package.json")) as { author?: string };
+    const manifest = JSON.parse(read("src/manifest.json")) as { author?: string };
+    expect(packageJson.author).toBe("Amal Ghosh");
+    expect(manifest.author).toBe("Amal Ghosh");
+  });
+
   it("uses conservative Markdown that renders on GitHub and the Joplin plugin page", () => {
     const readme = read("README.md");
     expect(readme).toMatch(/^# adocLIVE\n/);

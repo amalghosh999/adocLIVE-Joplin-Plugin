@@ -25,6 +25,9 @@ describe("candidate and release governance", () => {
     expect(publish).not.toContain("npm version");
     expect(publish).toContain("bundle.artifacts.npmTarball.path");
     expect(publish).toContain("bundle.artifacts.jpl.path");
+    const applyReceipt = source("baseline/apply-receipt.ts");
+    expect(applyReceipt).not.toContain("Applied 1.0.4");
+    expect(applyReceipt).toContain("Applied ${bundle.package.version}");
   });
 
   it("retains canonical CI candidates for 30 days and gates production audits", () => {

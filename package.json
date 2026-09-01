@@ -1,9 +1,9 @@
 {
   "name": "joplin-plugin-adoclive",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "adocLIVE AsciiDoc live-preview editor for Joplin",
   "license": "MIT",
-  "author": "Amal Ghosh <amalghosh999@gmail.com>",
+  "author": "Amal Ghosh",
   "contributors": [
     "Amal Ghosh <amalghosh999@gmail.com>",
     "Codex <noreply@openai.com>"

@@ -225,9 +225,9 @@ Receipt: [${path.basename(evidencePath)}](baseline-reviews/${path.basename(evide
 
 ## Previously recorded Linux matrix
 
-The repository owner approved the full Linux install, multi-window, lifecycle, view/theme, clipboard, media, hostile-fixture, upgrade, and closed-handle matrix on 2026-08-20 with no deviations reported. That performance/dashboard/Linux evidence is retained; the receipt below records the hardened 1.0.4 platform deltas.
+The repository owner approved the full Linux install, multi-window, lifecycle, view/theme, clipboard, media, hostile-fixture, upgrade, and closed-handle matrix on 2026-08-20 with no deviations reported. That performance/dashboard/Linux evidence is retained; the receipt below records the hardened ${bundle.package.version} platform deltas.
 
-## Applied 1.0.4 hardened-JPL platform evidence
+## Applied ${bundle.package.version} hardened-JPL platform evidence
 
 ${platformSection(windows)}
 ${platformSection(macos)}
