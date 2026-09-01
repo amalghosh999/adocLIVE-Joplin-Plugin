@@ -1,0 +1,174 @@
+{
+  "artifactHashes": {
+    "artifacts/com.asciidoc.joplin-plugin.jpl": "45df13eb1cc8e7ec50e4ebc8be18b24c953c10b07ab5c233f285640394fc0a83",
+    "artifacts/com.asciidoc.joplin-plugin.json": "e7cd01dcffa1dd408861f6dc0fb1c466346d0f8273c77c2480e33e79f0463ec7",
+    "artifacts/joplin-plugin-adoclive-1.0.5.tgz": "d381b8c75b531d2b5cf0d1d170f34c0dc4d408d8c9deeb5e734bf505deece005",
+    "metadata/package-lock.json": "15988f598c171e86fed20339208063453c1d73e5b6fa2f6ccc464656c2326d3e",
+    "metadata/plugin-manifest.json": "ff61aa9d5fad3cbb10d61ee6e6eef1faef9a70494ef79ef0f73ea9828bec0d21",
+    "reports/candidate-tests.json": "44c8a68a3f5f5e360de72d44a9ffa8129e6286e9f7660c39dd985a792436b0d7",
+    "reports/production-audit.json": "2da54565bcf74134102f815b4b832c672dce01717f7e9b1c10188ac4b790ae46",
+    "scroll/median-after.png": "aa87aa8ae8720d1e156224dfeb967168b818feffee7fa428bc9a5f91f1b8b013",
+    "scroll/median-before.png": "aa87aa8ae8720d1e156224dfeb967168b818feffee7fa428bc9a5f91f1b8b013",
+    "scroll/scroll-characterization.json": "1177c32f9a0a65b774fcc9d57d03358ff983ba8ebadedc17bd46e649bd14f78a",
+    "scroll/worst-after.png": "ddde85ce0e89d223899fad43fe907d716eae6a79c71ac5154300603bfbcf16a2",
+    "scroll/worst-before.png": "2e347bc55b706183edb7330120797e46703014aa2456d019090fbfaf543616ae",
+    "visual/before/block-editor-modal.png": "0421906351e3249929b9dcb114d9c3a489219196b48e587afa4095ee97e995cb",
+    "visual/before/block-gallery.png": "f4218f9dbc2ef25f762849be2cf8ad2b9c81aef64cc1b8bfb8fffa6751d30c19",
+    "visual/before/dark-live-preview.png": "9aececf633b2d84513f83506ccbccf8069f4f1ac2ea82d97222703121ac26c52",
+    "visual/before/floating-section-preview.png": "66afbef90b0082fa4c0a0cc03b45908febf38622937dc037fb241e29616ea48e",
+    "visual/before/footnote-popup.png": "99969141e2794c090b8d7db247f0eec6af7c195c9f8384fe227abb0a594ade44",
+    "visual/before/high-contrast-live-preview.png": "c70344f84709a58a29b104e8f11b292188a4cf051a83e7beb9c4fa93daec75b5",
+    "visual/before/light-live-preview.png": "3ac4f95d0ffa354028437a88cfd84a335a5e7f4408b8c43ab0053adb7e92add0",
+    "visual/before/light-preview.png": "398fde66bac029e5b5f0bf56e54dbf2168930a00bfe7a844caff604f3b9f7d4a",
+    "visual/before/light-raw.png": "1d3b369e48d3dc9ed6791dd1ea4ea3b12b108c5acd7f6a0d02e89b9405d453ef",
+    "visual/before/light-split.png": "1c7f98f30ef6b5b0f863251cfccb966af1111943afb328978cbaa6358dc0cbb1",
+    "visual/before/narrow-high-contrast.png": "000650d5b9fa87cb9356e467145bed02aceab472112b1b41f9ed4bcb5a4632ec",
+    "visual/before/search-ui.png": "344809425d251105910b27ba9e7b506c2ed452b3fd178cb66f1a8ed69a245531",
+    "visual/before/toolbar-dropdown.png": "2b27ee14e049b08dbb5078be5cd0cbf59a613a31cd4c00fbd11c6bf85f33a90f",
+    "visual/candidate/block-editor-modal.png": "0421906351e3249929b9dcb114d9c3a489219196b48e587afa4095ee97e995cb",
+    "visual/candidate/block-gallery.png": "f4218f9dbc2ef25f762849be2cf8ad2b9c81aef64cc1b8bfb8fffa6751d30c19",
+    "visual/candidate/dark-live-preview.png": "9aececf633b2d84513f83506ccbccf8069f4f1ac2ea82d97222703121ac26c52",
+    "visual/candidate/floating-section-preview.png": "66afbef90b0082fa4c0a0cc03b45908febf38622937dc037fb241e29616ea48e",
+    "visual/candidate/footnote-popup.png": "99969141e2794c090b8d7db247f0eec6af7c195c9f8384fe227abb0a594ade44",
+    "visual/candidate/high-contrast-live-preview.png": "c70344f84709a58a29b104e8f11b292188a4cf051a83e7beb9c4fa93daec75b5",
+    "visual/candidate/light-live-preview.png": "3ac4f95d0ffa354028437a88cfd84a335a5e7f4408b8c43ab0053adb7e92add0",
+    "visual/candidate/light-preview.png": "398fde66bac029e5b5f0bf56e54dbf2168930a00bfe7a844caff604f3b9f7d4a",
+    "visual/candidate/light-raw.png": "1d3b369e48d3dc9ed6791dd1ea4ea3b12b108c5acd7f6a0d02e89b9405d453ef",
+    "visual/candidate/light-split.png": "1c7f98f30ef6b5b0f863251cfccb966af1111943afb328978cbaa6358dc0cbb1",
+    "visual/candidate/narrow-high-contrast.png": "000650d5b9fa87cb9356e467145bed02aceab472112b1b41f9ed4bcb5a4632ec",
+    "visual/candidate/search-ui.png": "344809425d251105910b27ba9e7b506c2ed452b3fd178cb66f1a8ed69a245531",
+    "visual/candidate/toolbar-dropdown.png": "2b27ee14e049b08dbb5078be5cd0cbf59a613a31cd4c00fbd11c6bf85f33a90f",
+    "visual/diff/block-editor-modal.png": "445a13329e9b47ce89e34a5fcfbb2fc87da1600a665e329ee7882ac8e2036170",
+    "visual/diff/block-gallery.png": "d0954caa8e3d2301a0b66eb05c6d72086601514197d495692dd9bbe97fcfcbe7",
+    "visual/diff/dark-live-preview.png": "dc1fe61fcf84fff790a949b3c2968c8bdabddc6b6c04313c69804ce96c18bcdc",
+    "visual/diff/floating-section-preview.png": "5c08fb2bc69f1b345b0ec431c2e84dd7e0176b9f67ab7880daf1d1c17b572d44",
+    "visual/diff/footnote-popup.png": "ed5ded4c7ccc639d199743899e4093180042f5352c60bd224a549fefd132a7f3",
+    "visual/diff/high-contrast-live-preview.png": "870ee944f35ab0948f7e615d97360db9cc29bafa18bdf041717ee7ad53ef8405",
+    "visual/diff/light-live-preview.png": "6004eafad71a4cc97fae08c457ef5bc796b95b61db2625557a356d24b5312c34",
+    "visual/diff/light-preview.png": "0d65138157f8d902e3f855b633ec1d583e36e5146018e4831914ac2e36bc5031",
+    "visual/diff/light-raw.png": "9f7eeb32194ed6d817f40915c2846acc1bf5cc199b731da82f6bc71ac177b5df",
+    "visual/diff/light-split.png": "955bf61016793232dc019f3dc1494d64c0a9c04a1cb9a17f908a18c2200670fc",
+    "visual/diff/narrow-high-contrast.png": "90ced8fef8eb6a1e505d15249f6e145cbb961af76a1bfdc1271d2504f0111f7c",
+    "visual/diff/search-ui.png": "0da5a7c1d9152e40fe8022432157b8ad99d0cb6bd9c1a70c4b6f2fde1b9c8a98",
+    "visual/diff/toolbar-dropdown.png": "32c4525a0daf2ef0fdf82497a10827919f5434ffd7bd16f70acd118b6c2b9619"
+  },
+  "bundleDigest": "9a4f00bd4f2642841237a451b358f3e7a1dca24d6164baf61a19c44192585835",
+  "decisions": [
+    {
+      "decision": "approved",
+      "itemId": "block-gallery",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "block-editor-modal",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "dark-live-preview",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "floating-section-preview",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "footnote-popup",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "high-contrast-live-preview",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "light-live-preview",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "light-preview",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "light-raw",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "light-split",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "narrow-high-contrast",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "search-ui",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "toolbar-dropdown",
+      "note": ""
+    },
+    {
+      "decision": "approved",
+      "itemId": "scroll-raw-live-raw-mid-document",
+      "note": ""
+    }
+  ],
+  "kind": "BaselineReviewReceipt",
+  "knownIssueAcknowledgements": {
+    "ADL-022": true,
+    "ADL-023": true
+  },
+  "overallRationale": "all pass",
+  "platformEvidence": [
+    {
+      "date": "2026-08-31",
+      "deviations": "none",
+      "hardenedJplDelta": {
+        "hostileFixture": true,
+        "installStartup": true,
+        "representativeRender": true,
+        "themeAndViewChanges": true,
+        "upgrade": true
+      },
+      "joplinVersion": "3.5.13",
+      "osVersion": "11",
+      "platform": "windows",
+      "result": "pass",
+      "schemaVersion": 1,
+      "verifier": "lama999"
+    },
+    {
+      "date": "2026-08-31",
+      "deviations": "none",
+      "hardenedJplDelta": {
+        "hostileFixture": true,
+        "installStartup": true,
+        "representativeRender": true,
+        "themeAndViewChanges": true,
+        "upgrade": true
+      },
+      "joplinVersion": "3.5.13",
+      "osVersion": "26.2",
+      "platform": "macos",
+      "result": "pass",
+      "schemaVersion": 1,
+      "verifier": "lama999"
+    }
+  ],
+  "reviewedAt": "2026-09-01T02:18:11.820Z",
+  "reviewer": "lama999",
+  "schemaVersion": 1,
+  "sourceCommit": "ee4350f861f31c1aae6ee134f15ce40cde5d48d5"
+}
